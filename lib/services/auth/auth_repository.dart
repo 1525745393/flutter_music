@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../../core/network/synology_api.dart';
-import '../models/auth_session.dart';
-import '../models/login_draft.dart';
+import '../synology_api.dart';
+import '../../models/auth/auth_session.dart';
+import '../../models/auth/login_draft.dart';
 
 class AuthException implements Exception {
   const AuthException(this.message);

@@ -8,7 +8,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:flutter_music/app/app.dart';
+import 'package:flutter_music/main.dart';
 
 void main() {
   testWidgets('app renders login page', (WidgetTester tester) async {

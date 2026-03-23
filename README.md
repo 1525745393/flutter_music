@@ -82,48 +82,47 @@
 ```text
 lib/
   main.dart
-  app/
-    app.dart
-    router.dart
-    theme/
-      app_theme.dart
   core/
-    constants/
-    error/
+    config/
     network/
+      synology_api.dart
+      synology_api_constants.dart
+      synology_api_exception.dart
+      synology_audio_station_api.dart
+      synology_auth_api.dart
+      synology_base_api.dart
       dio_client.dart
-      api_result.dart
-    storage/
-    utils/
-  features/
+  router/
+    router.dart
+  models/
     auth/
-      data/
-        datasource/
-        models/
-        repositories/
-      domain/
-      presentation/
-        pages/
-        providers/
-        widgets/
+      login_draft.dart
+      auth_session.dart
     library/
-      data/
-      domain/
-      presentation/
+      song_item.dart
+  services/
+    auth/
+      auth_repository.dart
+    library/
+      library_repository.dart
+  pages/
+    login/
+      login_controller.dart
+      login_page.dart
+    home/
+      library_providers.dart
+      library_page.dart
     player/
-      data/
-      domain/
-      presentation/
-  shared/
-    widgets/
-    providers/
+      player_page.dart
+  widgets/
+  utils/
 ```
 
 设计原则：
 
-- 按 feature 组织业务，降低耦合；
-- data/domain/presentation 分层，便于测试与长期维护；
-- `core` 放通用能力，`shared` 放跨业务可复用组件。
+- 按层组织目录（`pages/controllers/models/services`），降低跨目录相对路径深度；
+- 业务模块作为子目录（例如 `services/auth`、`pages/login`），让文件归属更直观；
+- 将通用网络/协议能力（`core/network`），便于业务与 API 层共同演进。
 
 ---
 

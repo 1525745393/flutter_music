@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../auth/presentation/pages/login_page.dart';
-import '../../../auth/data/repositories/auth_repository.dart';
-import '../../../player/presentation/pages/player_page.dart';
-import '../providers/library_providers.dart';
+import '../login/login_page.dart';
+import '../../services/auth/auth_repository.dart';
+import '../player/player_page.dart';
+import '../../controllers/library/library_providers.dart';
 
 class LibraryPage extends ConsumerWidget {
   const LibraryPage({super.key});

@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../data/models/login_draft.dart';
-import '../../data/repositories/auth_repository.dart';
+import '../../models/auth/login_draft.dart';
+import '../../services/auth/auth_repository.dart';
 
 class LoginController extends Notifier<AsyncValue<void>> {
   @override

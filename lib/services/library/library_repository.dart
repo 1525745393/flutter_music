@@ -1,9 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/network/synology_api.dart';
-import '../../../auth/data/repositories/auth_repository.dart';
-import '../models/song_item.dart';
+import '../synology_api.dart';
+import '../auth/auth_repository.dart';
+import '../../models/library/song_item.dart';
 
 class LibraryException implements Exception {
   const LibraryException(this.message);
