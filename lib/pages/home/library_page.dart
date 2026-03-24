@@ -6,6 +6,7 @@ import '../login/login_page.dart';
 import '../../services/auth/auth_repository.dart';
 import '../player/player_page.dart';
 import '../../controllers/library/library_providers.dart';
+import '../../controllers/player/player_controller.dart';
 
 class LibraryPage extends ConsumerWidget {
   const LibraryPage({super.key});
@@ -50,7 +51,16 @@ class LibraryPage extends ConsumerWidget {
                   title: Text(song.title),
                   subtitle: Text('${song.artist} · ${song.album}'),
                   trailing: const Icon(Icons.play_arrow_rounded),
-                  onTap: () => context.go(PlayerPage.routePath),
+                  onTap: () async {
+                    // 设置当前播放的歌曲和播放队列
+                    await ref.read(playerControllerProvider.notifier)
+                        .setPlayQueue(songs, startIndex: index);
+                    
+                    // 跳转到播放页面
+                    if (context.mounted) {
+                      context.go(PlayerPage.routePath);
+                    }
+                  },
                 );
               },
             ),
