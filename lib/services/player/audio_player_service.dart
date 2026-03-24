@@ -1,12 +1,21 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
 import '../../models/library/song_item.dart';
 import '../../models/auth/auth_session.dart';
 import '../../core/network/synology_audio_station_api.dart';
 import '../auth/auth_repository.dart';
+
+/// 播放状态（用于UI显示）
+enum PlaybackStateEnum {
+  idle,
+  loading,
+  playing,
+  paused,
+  error,
+}
 
 /// 音频播放服务
 class AudioPlayerService {
@@ -30,9 +39,15 @@ class AudioPlayerService {
   
   /// 当前播放索引
   int _currentIndex = -1;
+
+  /// 认证仓库引用
+  AuthRepository? _authRepository;
+
+  /// 服务器URL
+  String? _serverUrl;
   
   /// 播放状态流
-  Stream<PlaybackState> get playbackState => _audioPlayer.playerStateStream.map(_mapPlayerState);
+  Stream<PlaybackStateEnum> get playbackState => _audioPlayer.playerStateStream.map(_mapPlayerState);
   
   /// 播放位置流
   Stream<Duration> get positionStream => _audioPlayer.positionStream;
@@ -42,42 +57,31 @@ class AudioPlayerService {
   
   /// 总时长流
   Stream<Duration?> get durationStream => _audioPlayer.durationStream;
-  
-  /// 播放错误流
-  Stream<PlayerException> get playerErrorStream => _audioPlayer.playerStateStream
-      .where((state) => state.processingState == ProcessingState.error)
-      .map((state) => state.error!);
+
+  /// 设置认证仓库
+  void setAuthRepository(AuthRepository authRepository) {
+    _authRepository = authRepository;
+  }
+
+  /// 设置服务器URL
+  void setServerUrl(String serverUrl) {
+    _serverUrl = serverUrl;
+  }
   
   /// 初始化音频会话
   Future<void> initialize() async {
     try {
       _audioSession = await AudioSession.instance;
-      await _audioSession!.configure(const AudioConfiguration(
-        avSessionCategory: AVSessionCategory.playback,
-        avSessionCategoryOptions: AVSessionCategoryOptions.defaultToSpeaker,
-      ));
+      await _audioSession!.configure(const AudioSessionConfiguration.music());
       
       // 监听播放状态变化
       _audioPlayer.playerStateStream.listen(_onPlayerStateChange);
       
-      // 监听位置变化
-      _audioPlayer.positionStream.listen((position) {
-        // 可以在这里更新播放进度
-      });
-      
       // 监听播放完成
-      _audioPlayer.sequenceStateStream.listen((sequenceState) {
-        if (sequenceState?.isLast ?? false) {
+      _audioPlayer.playerStateStream.listen((state) {
+        if (state.processingState == ProcessingState.completed) {
           // 播放完成，自动播放下一首
           _playNext();
-        }
-      });
-      
-      // 监听播放错误
-      _audioPlayer.playerStateStream.listen((state) {
-        if (state.processingState == ProcessingState.error) {
-          // 处理播放错误
-          _handlePlaybackError(state.error);
         }
       });
       
@@ -105,18 +109,10 @@ class AudioPlayerService {
       }
       
       // 获取歌曲 URL
-      final songInfo = await _getSongUrl(song.id, session.sessionId);
-      final audioUrl = songInfo['url'] as String?;
-      
-      if (audioUrl == null || audioUrl.isEmpty) {
-        throw Exception('无法获取歌曲 URL');
-      }
+      final audioUrl = _getSongUrl(song.id, session.sessionId);
       
       // 设置数据源
-      await _audioPlayer.setAudioSource(
-        AudioSource.uri(Uri.parse(audioUrl)),
-        initialPosition: Duration.zero,
-      );
+      await _audioPlayer.setUrl(audioUrl);
       
     } catch (e) {
       debugPrint('加载歌曲失败: $e');
@@ -125,17 +121,20 @@ class AudioPlayerService {
   }
   
   /// 获取歌曲 URL
-  Future<Map<String, dynamic>> _getSongUrl(String songId, String sessionId) async {
-    final api = SynologyAudioStationApi(serverUrl: 'placeholder'); // 需要从会话获取
-    // 这里需要根据实际 API 实现
-    // 返回格式: {'url': 'http://...'}
-    throw UnimplementedError('需要实现获取歌曲 URL 的方法');
+  String _getSongUrl(String songId, String sessionId) {
+    if (_serverUrl == null) {
+      throw Exception('服务器URL未设置');
+    }
+    final api = SynologyAudioStationApi(serverUrl: _serverUrl!);
+    return api.buildSongStreamUrl(songId: songId, sid: sessionId);
   }
   
   /// 获取认证会话
   Future<AuthSession?> _getAuthSession() async {
-    // 这里需要实现从 AuthRepository 获取会话
-    throw UnimplementedError('需要实现获取认证会话的方法');
+    if (_authRepository == null) {
+      return null;
+    }
+    return await _authRepository!.loadSession();
   }
   
   /// 播放
@@ -222,16 +221,27 @@ class AudioPlayerService {
     }
   }
   
-  /// 处理播放错误
-  void _handlePlaybackError(PlayerException? error) {
-    debugPrint('播放错误: ${error?.message}');
-    // 可以在这里添加错误处理逻辑，比如显示错误提示
-  }
-  
   /// 播放状态变化处理
   void _onPlayerStateChange(PlayerState state) {
-    // 可以在这里添加状态变化处理逻辑
-    debugPrint('播放状态变化: ${state.playing}');
+    debugPrint('播放状态变化: ${state.playing}, processingState: ${state.processingState}');
+  }
+
+  /// 映射播放状态
+  PlaybackStateEnum _mapPlayerState(PlayerState state) {
+    if (state.playing) {
+      return PlaybackStateEnum.playing;
+    }
+    switch (state.processingState) {
+      case ProcessingState.idle:
+        return PlaybackStateEnum.idle;
+      case ProcessingState.loading:
+      case ProcessingState.buffering:
+        return PlaybackStateEnum.loading;
+      case ProcessingState.ready:
+        return PlaybackStateEnum.paused;
+      case ProcessingState.completed:
+        return PlaybackStateEnum.idle;
+    }
   }
   
   /// 获取当前播放的歌曲
@@ -253,6 +263,12 @@ class AudioPlayerService {
   
   /// 是否正在播放
   bool get isPlaying => _audioPlayer.playing;
+
+  /// 获取播放队列
+  List<SongItem> get playQueue => List.unmodifiable(_playQueue);
+
+  /// 获取当前播放索引
+  int get currentIndex => _currentIndex;
   
   /// 清理资源
   void dispose() {
@@ -262,11 +278,14 @@ class AudioPlayerService {
 
 /// 音频播放服务 Provider
 final audioPlayerServiceProvider = Provider<AudioPlayerService>((ref) {
-  return AudioPlayerService();
+  final service = AudioPlayerService();
+  final authRepository = ref.read(authRepositoryProvider);
+  service.setAuthRepository(authRepository);
+  return service;
 });
 
 /// 播放状态 Provider
-final playbackStateProvider = StreamProvider<PlaybackState>((ref) {
+final playbackStateProvider = StreamProvider<PlaybackStateEnum>((ref) {
   final service = ref.read(audioPlayerServiceProvider);
   return service.playbackState;
 });
@@ -284,7 +303,7 @@ final durationProvider = StreamProvider<Duration?>((ref) {
 });
 
 /// 当前歌曲 Provider
-final currentSongProvider = Provider<SongItem?>((ref) {
+final currentSongProviderFromService = Provider<SongItem?>((ref) {
   final service = ref.read(audioPlayerServiceProvider);
   return service.currentSong;
 });

@@ -4,9 +4,10 @@ import 'package:go_router/go_router.dart';
 
 import '../login/login_page.dart';
 import '../../services/auth/auth_repository.dart';
+import '../../services/library/favorites_repository.dart';
 import '../player/player_page.dart';
-import '../../controllers/library/library_providers.dart';
-import '../../controllers/player/player_controller.dart';
+import 'library_providers.dart';
+import '../player/player_controller.dart';
 
 class LibraryPage extends ConsumerWidget {
   const LibraryPage({super.key});
@@ -47,15 +48,74 @@ class LibraryPage extends ConsumerWidget {
               separatorBuilder: (context, index) => const Divider(height: 1),
               itemBuilder: (context, index) {
                 final song = songs[index];
+                final isFavoriteAsync = ref.watch(isFavoriteProvider(song.id));
+
                 return ListTile(
                   title: Text(song.title),
                   subtitle: Text('${song.artist} · ${song.album}'),
-                  trailing: const Icon(Icons.play_arrow_rounded),
+                  leading: song.coverUrl != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            song.coverUrl!,
+                            width: 48,
+                            height: 48,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                width: 48,
+                                height: 48,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.surfaceContainerHighest,
+                                child: const Icon(Icons.music_note),
+                              );
+                            },
+                          ),
+                        )
+                      : Container(
+                          width: 48,
+                          height: 48,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHighest,
+                          child: const Icon(Icons.music_note),
+                        ),
+                  trailing: isFavoriteAsync.when(
+                    data: (isFavorite) {
+                      return IconButton(
+                        icon: Icon(
+                          isFavorite ? Icons.favorite : Icons.favorite_border,
+                          color: isFavorite ? Colors.red : null,
+                        ),
+                        onPressed: () async {
+                          final repository = ref.read(
+                            favoritesRepositoryProvider,
+                          );
+                          if (isFavorite) {
+                            await repository.removeFavorite(song.id);
+                          } else {
+                            await repository.addFavorite(song);
+                          }
+                        },
+                        tooltip: isFavorite ? '取消收藏' : '收藏',
+                      );
+                    },
+                    loading: () => const IconButton(
+                      icon: Icon(Icons.favorite_border),
+                      onPressed: null,
+                    ),
+                    error: (error, stackTrace) => const IconButton(
+                      icon: Icon(Icons.favorite_border),
+                      onPressed: null,
+                    ),
+                  ),
                   onTap: () async {
                     // 设置当前播放的歌曲和播放队列
-                    await ref.read(playerControllerProvider.notifier)
+                    await ref
+                        .read(playerControllerProvider.notifier)
                         .setPlayQueue(songs, startIndex: index);
-                    
+
                     // 跳转到播放页面
                     if (context.mounted) {
                       context.go(PlayerPage.routePath);

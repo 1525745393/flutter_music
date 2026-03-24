@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/library/song_item.dart';
 import '../../services/player/audio_player_service.dart';
+import '../../services/auth/auth_repository.dart';
 
 /// 播放状态枚举
 enum PlayerState {
@@ -17,32 +18,30 @@ class PlayerController extends Notifier<PlayerState> {
   PlayerState build() {
     // 监听音频播放服务状态
     ref.listen(playbackStateProvider, (previous, next) {
-      if (next != null) {
-        _updatePlayerState(next);
-      }
-    });
-    
-    // 监听当前歌曲
-    ref.listen(currentSongProvider, (previous, next) {
-      if (next != null) {
-        _currentSong = next;
+      if (next.value != null) {
+        _updatePlayerState(next.value!);
       }
     });
     
     // 初始化音频服务
-    ref.read(audioPlayerServiceProvider).initialize();
+    _initializeAudioService();
     
     return PlayerState.idle;
   }
 
+  /// 初始化音频服务
+  Future<void> _initializeAudioService() async {
+    final service = ref.read(audioPlayerServiceProvider);
+    final authRepository = ref.read(authRepositoryProvider);
+    final session = await authRepository.loadSession();
+    if (session != null) {
+      service.setServerUrl(session.serverUrl);
+    }
+    await service.initialize();
+  }
+
   /// 当前播放的歌曲
   SongItem? _currentSong;
-  
-  /// 当前播放进度（秒）
-  double _currentPosition = 0.0;
-  
-  /// 歌曲总时长（秒）
-  double _duration = 0.0;
   
   /// 播放队列
   List<SongItem> _playQueue = [];
@@ -52,12 +51,6 @@ class PlayerController extends Notifier<PlayerState> {
 
   /// 获取当前播放的歌曲
   SongItem? get currentSong => _currentSong;
-
-  /// 获取当前播放进度
-  double get currentPosition => _currentPosition;
-
-  /// 获取歌曲总时长
-  double get duration => _duration;
 
   /// 获取播放队列
   List<SongItem> get playQueue => List.unmodifiable(_playQueue);
@@ -75,7 +68,13 @@ class PlayerController extends Notifier<PlayerState> {
       state = PlayerState.loading;
       
       // 设置音频播放服务队列
-      await ref.read(audioPlayerServiceProvider).setPlayQueue(queue, startIndex: startIndex);
+      final service = ref.read(audioPlayerServiceProvider);
+      final authRepository = ref.read(authRepositoryProvider);
+      final session = await authRepository.loadSession();
+      if (session != null) {
+        service.setServerUrl(session.serverUrl);
+      }
+      await service.setPlayQueue(queue, startIndex: startIndex);
     }
   }
 
@@ -131,30 +130,23 @@ class PlayerController extends Notifier<PlayerState> {
     }
   }
 
-  /// 更新播放进度
-  void updatePosition(double position) {
-    _currentPosition = position;
-  }
-
-  /// 更新歌曲时长
-  void updateDuration(double newDuration) {
-    _duration = newDuration;
-  }
-
   /// 更新播放状态
-  void _updatePlayerState(PlaybackState playbackState) {
-    switch (playbackState.playing) {
-      case true:
+  void _updatePlayerState(PlaybackStateEnum playbackState) {
+    switch (playbackState) {
+      case PlaybackStateEnum.playing:
         state = PlayerState.playing;
         break;
-      case false:
-        if (playbackState.processingState == ProcessingState.loading) {
-          state = PlayerState.loading;
-        } else if (playbackState.processingState == ProcessingState.error) {
-          state = PlayerState.error;
-        } else {
-          state = PlayerState.paused;
-        }
+      case PlaybackStateEnum.loading:
+        state = PlayerState.loading;
+        break;
+      case PlaybackStateEnum.paused:
+        state = PlayerState.paused;
+        break;
+      case PlaybackStateEnum.idle:
+        state = PlayerState.idle;
+        break;
+      case PlaybackStateEnum.error:
+        state = PlayerState.error;
         break;
     }
   }
@@ -162,8 +154,6 @@ class PlayerController extends Notifier<PlayerState> {
   /// 清除播放状态
   void clear() {
     _currentSong = null;
-    _currentPosition = 0.0;
-    _duration = 0.0;
     _playQueue = [];
     _currentIndex = -1;
     state = PlayerState.idle;
@@ -177,21 +167,7 @@ final playerControllerProvider = NotifierProvider<PlayerController, PlayerState>
 
 /// 当前播放歌曲的 Provider
 final currentSongProvider = Provider<SongItem?>((ref) {
-  return ref.watch(currentSongProviderFromAudioService);
-});
-
-/// 音频服务当前歌曲的 Provider
-final currentSongProviderFromAudioService = Provider<SongItem?>((ref) {
-  final service = ref.read(audioPlayerServiceProvider);
-  return service.currentSong;
-});
-
-/// 播放进度的 Provider
-final playbackProgressProvider = Provider<double>((ref) {
-  final service = ref.read(audioPlayerServiceProvider);
-  final currentPosition = service.currentPosition.inMilliseconds.toDouble();
-  final duration = service.duration?.inMilliseconds.toDouble() ?? 1.0;
-  return duration > 0 ? currentPosition / duration : 0.0;
+  return ref.watch(currentSongProviderFromService);
 });
 
 /// 播放队列的 Provider
@@ -204,12 +180,6 @@ final playQueueProvider = Provider<List<SongItem>>((ref) {
 final currentIndexProvider = Provider<int>((ref) {
   final service = ref.read(audioPlayerServiceProvider);
   return service.currentIndex;
-});
-
-/// 播放状态流 Provider
-final playbackStateStreamProvider = StreamProvider<PlaybackState>((ref) {
-  final service = ref.read(audioPlayerServiceProvider);
-  return service.playbackState;
 });
 
 /// 播放位置流 Provider
