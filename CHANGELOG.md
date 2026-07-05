@@ -1,3 +1,10 @@
+## [1.2.2](https://github.com/1525745393/flutter_music/compare/v1.2.1...v1.2.2) (2026-07-05)
+
+
+### Bug Fixes
+
+* 修复 QuickConnect API 请求格式，使用正确的抓包参数 ([395c547](https://github.com/1525745393/flutter_music/commit/395c547007c67f4a66306b2dd6e2d98bc21f5ddf))
+
 ## [1.2.1](https://github.com/1525745393/flutter_music/compare/v1.2.0...v1.2.1) (2026-07-05)
 
 
