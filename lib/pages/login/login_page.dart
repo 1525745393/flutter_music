@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/network/synology_api.dart';
 import '../home/library_page.dart';
 import './login_controller.dart';
 
@@ -86,17 +87,22 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               TextFormField(
                 controller: _serverController,
                 decoration: const InputDecoration(
-                  labelText: '服务器地址 (https://nas.xxx.com)',
+                  labelText: '服务器地址或 QuickConnect ID',
+                  hintText: 'https://nas.xxx.com 或 mynas',
                 ),
                 keyboardType: TextInputType.url,
                 validator: (value) {
                   final text = value?.trim() ?? '';
                   if (text.isEmpty) {
-                    return '请输入服务器地址';
+                    return '请输入服务器地址或 QuickConnect ID';
                   }
-                  if (!text.startsWith('http://') &&
+                  // 支持 QuickConnect ID 或标准 URL
+                  final isQuickConnect =
+                      QuickConnectService.isQuickConnectId(text);
+                  if (!isQuickConnect &&
+                      !text.startsWith('http://') &&
                       !text.startsWith('https://')) {
-                    return '地址需以 http:// 或 https:// 开头';
+                    return '请输入有效的 URL 或 QuickConnect ID';
                   }
                   return null;
                 },

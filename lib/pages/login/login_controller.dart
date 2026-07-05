@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/network/synology_api.dart';
 import '../../models/auth/login_draft.dart';
 import '../../services/auth/auth_repository.dart';
 
@@ -24,6 +25,9 @@ class LoginController extends Notifier<AsyncValue<void>> {
     } on AuthException catch (e, st) {
       state = AsyncError(e, st);
       return e.message;
+    } on QuickConnectException catch (e, st) {
+      state = AsyncError(e, st);
+      return 'QuickConnect 解析失败：${e.message}';
     } catch (e, st) {
       state = AsyncError(e, st);
       final errorMsg = e.toString();

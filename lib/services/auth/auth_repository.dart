@@ -24,8 +24,11 @@ class AuthRepository {
     required String username,
     required String password,
   }) async {
+    // 如果输入是 QuickConnect ID，先解析为实际访问地址
+    final actualServerUrl = await _resolveServerUrlIfNeeded(serverUrl);
+
     final data = await _loginByApi(
-      serverUrl: serverUrl,
+      serverUrl: actualServerUrl,
       username: username,
       password: password,
     );
@@ -43,9 +46,21 @@ class AuthRepository {
     }
 
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_keyServerUrl, serverUrl);
+    // 存储解析后的实际地址，便于后续 API 调用
+    await prefs.setString(_keyServerUrl, actualServerUrl);
     await prefs.setString(_keyUsername, username);
     await prefs.setString(_keySessionId, sid);
+  }
+
+  /// 判断输入是否为 QuickConnect ID，如果是则解析为实际访问地址
+  Future<String> _resolveServerUrlIfNeeded(String input) async {
+    if (!QuickConnectService.isQuickConnectId(input)) {
+      return input;
+    }
+
+    final quickConnectService = QuickConnectService();
+    final info = await quickConnectService.resolve(input);
+    return info.serverUrl;
   }
 
   Future<Map<String, dynamic>> _loginByApi({
