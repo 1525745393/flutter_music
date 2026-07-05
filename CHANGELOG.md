@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/1525745393/flutter_music/compare/v1.0.3...v1.1.0) (2026-07-05)
+
+
+### Features
+
+* 添加完整 QuickConnect 协议支持 ([a01e8b5](https://github.com/1525745393/flutter_music/commit/a01e8b5597cdb14f1db81e5426768f086ed8e1ff))
+
 ## [1.0.3](https://github.com/1525745393/flutter_music/compare/v1.0.2...v1.0.3) (2026-07-05)
 
 
