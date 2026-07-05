@@ -1,3 +1,10 @@
+## [1.2.5](https://github.com/1525745393/flutter_music/compare/v1.2.4...v1.2.5) (2026-07-05)
+
+
+### Bug Fixes
+
+* 完整修复 QuickConnect 登录的 7 个关键问题 ([6194d0e](https://github.com/1525745393/flutter_music/commit/6194d0e982834abb73de78aa58d67537a89fcf1d))
+
 ## [1.2.4](https://github.com/1525745393/flutter_music/compare/v1.2.3...v1.2.4) (2026-07-05)
 
 
