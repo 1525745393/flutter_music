@@ -16,8 +16,8 @@ class DioClient {
       // QuickConnect 会涉及多个域名：quickconnect.to、quickconnect.cn、
       // relay.quickconnect.*、实际 NAS IP/DDNS 等，统一放行避免证书问题
       dio.httpClientAdapter = IOHttpClientAdapter(
-        createHttpClient: (SecurityContext? context) {
-          final client = HttpClient(context);
+        createHttpClient: () {
+          final client = HttpClient();
           client.badCertificateCallback =
               (X509Certificate cert, String host, int port) => true;
           return client;
