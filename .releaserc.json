@@ -1,0 +1,37 @@
+{
+  "branches": ["main"],
+  "plugins": [
+    "@semantic-release/commit-analyzer",
+    "@semantic-release/release-notes-generator",
+    "@semantic-release/changelog",
+    [
+      "@semantic-release/exec",
+      {
+        "verifyConditionsCmd": "flutter analyze",
+        "prepareCmd": "./scripts/update_version.sh ${nextRelease.version}",
+        "publishCmd": "flutter build apk --release --build-name=${nextRelease.version} --no-tree-shake-icons"
+      }
+    ],
+    [
+      "@semantic-release/git",
+      {
+        "assets": [
+          "pubspec.yaml",
+          "CHANGELOG.md"
+        ],
+        "message": "chore(release): ${nextRelease.version}\n\n${nextRelease.notes}"
+      }
+    ],
+    [
+      "@semantic-release/github",
+      {
+        "assets": [
+          {
+            "path": "build/app/outputs/flutter-apk/app-release.apk",
+            "label": "App ${nextRelease.version}"
+          }
+        ]
+      }
+    ]
+  ]
+}
