@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/1525745393/flutter_music/compare/v1.0.0...v1.0.1) (2026-07-05)
+
+
+### Bug Fixes
+
+* 修复 build.gradle.kts 中 java.io.File 引用错误 ([062a9c6](https://github.com/1525745393/flutter_music/commit/062a9c617aa8152d46655b0e09869ae3020bc1ad))
+
 # 1.0.0 (2026-07-05)
 
 
