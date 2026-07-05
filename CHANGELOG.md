@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/1525745393/flutter_music/compare/v1.1.1...v1.2.0) (2026-07-05)
+
+
+### Features
+
+* QuickConnect 增加中国区支持和自动区域检测 ([cdcf120](https://github.com/1525745393/flutter_music/commit/cdcf12067e8c95e0ea1ab9e06b403623176eb7c6))
+
 ## [1.1.1](https://github.com/1525745393/flutter_music/compare/v1.1.0...v1.1.1) (2026-07-05)
 
 
