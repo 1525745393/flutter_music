@@ -1,3 +1,11 @@
+## [1.2.6](https://github.com/1525745393/flutter_music/compare/v1.2.5...v1.2.6) (2026-07-05)
+
+
+### Bug Fixes
+
+* 修复 DioClient badCertificateCallback 类型不匹配，使用 IOHttpClientAdapter ([79a789e](https://github.com/1525745393/flutter_music/commit/79a789eebf91060252df463286f251bf05f09ef6))
+* 修正 IOHttpClientAdapter createHttpClient 签名，移除 SecurityContext 参数 ([f82af74](https://github.com/1525745393/flutter_music/commit/f82af74e7eeb9ab2e742f60dd63cb4d276f7b80a))
+
 ## [1.2.5](https://github.com/1525745393/flutter_music/compare/v1.2.4...v1.2.5) (2026-07-05)
 
 
