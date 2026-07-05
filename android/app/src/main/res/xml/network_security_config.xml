@@ -12,4 +12,10 @@
             <certificates src="system" />
         </trust-anchors>
     </domain-config>
+    <domain-config>
+        <domain includeSubdomains="true">quickconnect.cn</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
 </network-security-config>
