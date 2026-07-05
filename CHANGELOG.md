@@ -1,3 +1,10 @@
+## [1.2.4](https://github.com/1525745393/flutter_music/compare/v1.2.3...v1.2.4) (2026-07-05)
+
+
+### Bug Fixes
+
+* 修改 QuickConnect 请求流程，先 GET 获取 control_host ([08c6b4e](https://github.com/1525745393/flutter_music/commit/08c6b4ea51f0ed0d249bdeb490bea298b6614425))
+
 ## [1.2.3](https://github.com/1525745393/flutter_music/compare/v1.2.2...v1.2.3) (2026-07-05)
 
 
