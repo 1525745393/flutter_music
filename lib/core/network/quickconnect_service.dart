@@ -224,23 +224,24 @@ class QuickConnectService {
     final domainSuffix =
         region == QuickConnectRegion.china ? _domainChina : _domainGlobal;
 
-    // 第一步：获取 server info
+    // 第一步：GET 请求全局服务器根路径，获取 control_host
+    final controlHost = await _getControlHost(dio, globalUrl);
+    if (controlHost.isEmpty) {
+      throw QuickConnectException(
+        '无法从${region == QuickConnectRegion.china ? '中国区' : '全球区'}服务器获取 control_host',
+      );
+    }
+
+    // 第二步：POST 请求 control_host 的 Serv.php，获取 server info
     final serverInfo = await _requestServerInfo(
       dio,
-      globalUrl,
+      'https://$controlHost/Serv.php',
       quickConnectId,
     );
 
     final env =
         (serverInfo['env'] as Map<String, dynamic>?) ?? <String, dynamic>{};
-    final controlHost = env['control_host'] as String?;
     final relayRegion = env['relay_region'] as String?;
-
-    if (controlHost == null || controlHost.isEmpty) {
-      throw QuickConnectException(
-        '无法从${region == QuickConnectRegion.china ? '中国区' : '全球区'}服务器获取 control_host，请检查 QuickConnect ID 是否正确',
-      );
-    }
 
     // 提取 Smart DNS 直连地址
     final smartDns =
@@ -256,7 +257,7 @@ class QuickConnectService {
       }
     }
 
-    // 如果有 relay_region，直接构造 URL（第一步就能拿到）
+    // 如果有 relay_region，直接构造 URL
     if (relayRegion != null && relayRegion.isNotEmpty) {
       final serverUrl = 'https://$quickConnectId.$relayRegion.$domainSuffix';
       return QuickConnectInfo(
@@ -269,7 +270,7 @@ class QuickConnectService {
       );
     }
 
-    // 第二步：请求 tunnel，拿到 relay_region
+    // 第三步：请求 tunnel，拿到 relay_region
     final tunnelInfo = await _requestTunnel(
       dio,
       controlHost,
@@ -292,6 +293,28 @@ class QuickConnectService {
       directHost: directHost,
       lanHosts: lanHosts,
     );
+  }
+
+  /// GET 请求全局服务器根路径，获取 control_host
+  Future<String> _getControlHost(Dio dio, String globalUrl) async {
+    try {
+      final globalRootUrl = globalUrl.replaceFirst('/Serv.php', '');
+      final response = await dio.get<String>(
+        globalRootUrl,
+        options: Options(
+          responseType: ResponseType.plain,
+        ),
+      );
+      final result = response.data?.trim() ?? '';
+      if (result.isEmpty) {
+        throw QuickConnectException('全局服务器返回空的 control_host');
+      }
+      return result;
+    } on DioException catch (e) {
+      throw QuickConnectException(
+        '获取 control_host 失败：${e.message ?? e.toString()}',
+      );
+    }
   }
 
   /// 请求 server info
