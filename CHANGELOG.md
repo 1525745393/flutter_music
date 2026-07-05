@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/1525745393/flutter_music/compare/v1.2.0...v1.2.1) (2026-07-05)
+
+
+### Bug Fixes
+
+* QuickConnect 错误信息显示所有区域失败详情 ([c0eeec5](https://github.com/1525745393/flutter_music/commit/c0eeec5c389397ee3f3ce53d4dd99ecfc9d370f5))
+
 # [1.2.0](https://github.com/1525745393/flutter_music/compare/v1.1.1...v1.2.0) (2026-07-05)
 
 
