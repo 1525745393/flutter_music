@@ -12,54 +12,38 @@ class QuickConnectException implements Exception {
   String toString() => message;
 }
 
-/// QuickConnect 区域
-enum QuickConnectRegion {
-  /// 中国区 (.quickconnect.cn)
-  china,
-
-  /// 全球区 (.quickconnect.to)
-  global,
-}
-
 /// QuickConnect 解析结果
+///
+/// 包含多个候选地址，调用方需逐一尝试登录，
+/// 第一个成功的地址即为最终使用的 baseUrl。
 class QuickConnectInfo {
   const QuickConnectInfo({
-    required this.serverUrl,
-    required this.relayRegion,
-    required this.controlHost,
-    required this.area,
-    this.directHost,
-    this.lanHosts = const [],
+    required this.candidateUrls,
+    this.relayRegion,
+    this.controlHost,
   });
 
-  /// 最终可访问的 NAS 地址（含 https:// 前缀）
-  final String serverUrl;
+  /// 候选 NAS 地址列表（含 https:// 前缀），按优先级排序
+  ///
+  /// 顺序通常为：直连地址 → control_host 地址 → relay 中继地址
+  final List<String> candidateUrls;
 
-  /// 中继区域（如 cnc、cnx、us、tw 等）
-  final String relayRegion;
+  /// 中继区域（如 cn、us、tw 等）
+  final String? relayRegion;
 
   /// 控制服务器主机
-  final String controlHost;
-
-  /// 所属区域（中国/全球）
-  final QuickConnectRegion area;
-
-  /// 外部直连地址（Smart DNS）
-  final String? directHost;
-
-  /// 局域网直连地址列表
-  final List<String> lanHosts;
-
-  /// 域名后缀
-  String get domainSuffix =>
-      area == QuickConnectRegion.china ? 'quickconnect.cn' : 'quickconnect.to';
+  final String? controlHost;
 }
 
 /// 群晖 QuickConnect 协议解析服务
 ///
-/// 基于抓包分析的真实 API 格式实现
-/// 支持中国区和全球区自动切换
-/// 支持 Smart DNS 直连地址获取
+/// 实现流程：
+/// 1. POST 请求 global.quickconnect.cn/Serv.php 获取 server info
+/// 2. 从响应中提取 control_host、relay_region、smartdns 等信息
+/// 3. 构造多个候选 URL（直连、中继、relay 兜底）
+/// 4. 调用方遍历候选 URL 尝试登录，第一个成功即使用
+///
+/// 自动支持中国区 (.cn) 和全球区 (.to) fallback
 class QuickConnectService {
   QuickConnectService();
 
@@ -69,9 +53,11 @@ class QuickConnectService {
   /// 全球区全局服务地址
   static const _globalUrlGlobal = 'https://global.quickconnect.to/Serv.php';
 
-  /// 域名后缀
-  static const _domainChina = 'quickconnect.cn';
-  static const _domainGlobal = 'quickconnect.to';
+  /// 中国区 relay 兜底地址
+  static const _relayUrlChina = 'https://relay.quickconnect.cn';
+
+  /// 全球区 relay 兜底地址
+  static const _relayUrlGlobal = 'https://relay.quickconnect.to';
 
   /// 构建 get_server_info 请求 payload
   Map<String, dynamic> _buildServerInfoPayload(String quickConnectId) {
@@ -84,15 +70,184 @@ class QuickConnectService {
     };
   }
 
-  /// 构建 request_tunnel 请求 payload
-  Map<String, dynamic> _buildTunnelPayload(String quickConnectId) {
-    return {
-      'version': 1,
-      'command': 'request_tunnel',
-      'id': 'dsm',
-      'serverID': quickConnectId,
-      'platform': 'Android',
-    };
+  /// 解析 QuickConnect ID，返回候选 NAS 地址列表
+  ///
+  /// 自动尝试中国区和全球区服务器
+  Future<QuickConnectInfo> resolve(String quickConnectId) async {
+    final cleanId = _cleanQuickConnectId(quickConnectId);
+    if (cleanId.isEmpty) {
+      throw const QuickConnectException('QuickConnect ID 不能为空');
+    }
+
+    final preferChina = _preferChinaRegion(quickConnectId);
+
+    final dio = Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 12),
+        receiveTimeout: const Duration(seconds: 20),
+        validateStatus: (status) => status != null && status < 500,
+      ),
+    );
+
+    try {
+      // 按优先级尝试不同区域的全局服务器
+      final servers = preferChina
+          ? [_globalUrlChina, _globalUrlGlobal]
+          : [_globalUrlGlobal, _globalUrlChina];
+
+      final List<String> errorMessages = [];
+      QuickConnectInfo? lastResult;
+
+      for (final globalUrl in servers) {
+        try {
+          lastResult = await _resolveWithServer(
+            dio: dio,
+            quickConnectId: cleanId,
+            globalUrl: globalUrl,
+          );
+          // 如果拿到了候选地址，直接返回
+          if (lastResult.candidateUrls.isNotEmpty) {
+            return lastResult;
+          }
+        } on QuickConnectException catch (e) {
+          errorMessages.add(e.message);
+          continue;
+        } on DioException catch (e) {
+          errorMessages.add('连接服务器失败：${e.message ?? e.toString()}');
+          continue;
+        }
+      }
+
+      // 所有服务器都失败，用已知模式构造兜底候选 URL
+      final fallbackUrls = _buildFallbackUrls(cleanId, preferChina);
+      if (fallbackUrls.isNotEmpty) {
+        return QuickConnectInfo(
+          candidateUrls: fallbackUrls,
+          relayRegion: null,
+          controlHost: null,
+        );
+      }
+
+      final errorMsg = errorMessages.join('；');
+      throw QuickConnectException(
+        'QuickConnect 解析失败，请检查网络连接或 QuickConnect ID 是否正确。错误详情：$errorMsg',
+      );
+    } finally {
+      dio.close();
+    }
+  }
+
+  /// 使用指定全局服务器解析
+  Future<QuickConnectInfo> _resolveWithServer({
+    required Dio dio,
+    required String quickConnectId,
+    required String globalUrl,
+  }) async {
+    // POST 请求 global.quickconnect.cn/Serv.php 获取 server info
+    final serverInfo = await _requestServerInfo(
+      dio,
+      globalUrl,
+      quickConnectId,
+    );
+
+    final env =
+        (serverInfo['env'] as Map<String, dynamic>?) ?? <String, dynamic>{};
+    final controlHost = env['control_host'] as String?;
+    final relayRegion = env['relay_region'] as String?;
+
+    // 判断域名后缀（根据请求的全局服务器）
+    final isChina = globalUrl.contains('.quickconnect.cn');
+    final domainSuffix = isChina ? 'quickconnect.cn' : 'quickconnect.to';
+
+    final candidateUrls = <String>[];
+
+    // 1. Smart DNS 直连地址（优先级最高）
+    final smartDns =
+        (serverInfo['smartdns'] as Map<String, dynamic>?) ?? <String, dynamic>{};
+    final directHost = smartDns['host'] as String?;
+    if (directHost != null && directHost.isNotEmpty) {
+      candidateUrls.add('https://$directHost');
+    }
+
+    // 2. 局域网地址
+    final lanList = smartDns['lan'] as List<dynamic>?;
+    if (lanList != null) {
+      for (final lan in lanList) {
+        if (lan is String && lan.isNotEmpty) {
+          candidateUrls.add('https://$lan');
+        }
+      }
+    }
+
+    // 3. 基于 relay_region 构造的中继地址
+    if (relayRegion != null && relayRegion.isNotEmpty) {
+      candidateUrls.add(
+        'https://$quickConnectId.$relayRegion.$domainSuffix',
+      );
+    }
+
+    // 4. control_host 直连地址
+    if (controlHost != null && controlHost.isNotEmpty) {
+      // control_host 可能带端口（如 host:port），也可能不带
+      if (!candidateUrls.contains('https://$controlHost')) {
+        candidateUrls.add('https://$controlHost');
+      }
+    }
+
+    // 5. relay 兜底地址
+    final relayUrl = isChina ? _relayUrlChina : _relayUrlGlobal;
+    candidateUrls.add('$relayUrl/$quickConnectId');
+
+    // 去重
+    final uniqueUrls = candidateUrls.toSet().toList();
+
+    return QuickConnectInfo(
+      candidateUrls: uniqueUrls,
+      relayRegion: relayRegion,
+      controlHost: controlHost,
+    );
+  }
+
+  /// 构造兜底候选 URL（当 API 请求失败时使用）
+  ///
+  /// 基于已知 QuickConnect URL 模式构造
+  List<String> _buildFallbackUrls(String quickConnectId, bool preferChina) {
+    final urls = <String>[];
+
+    if (preferChina) {
+      // 中国区常见 relay_region
+      for (final region in ['cn', 'cnc']) {
+        urls.add('https://$quickConnectId.$region.quickconnect.cn');
+      }
+      // relay 兜底
+      urls.add('$_relayUrlChina/$quickConnectId');
+    }
+
+    // 全球区兜底
+    for (final region in ['us', 'tw', 'de']) {
+      urls.add('https://$quickConnectId.$region.quickconnect.to');
+    }
+
+    return urls;
+  }
+
+  /// POST 请求 server info
+  ///
+  /// 使用 jsonEncode 确保发送真正的 JSON body
+  Future<Map<String, dynamic>> _requestServerInfo(
+    Dio dio,
+    String globalUrl,
+    String quickConnectId,
+  ) async {
+    final response = await dio.post<dynamic>(
+      globalUrl,
+      data: jsonEncode(_buildServerInfoPayload(quickConnectId)),
+      options: Options(
+        headers: {'Content-Type': 'application/json'},
+        responseType: ResponseType.json,
+      ),
+    );
+    return _parseResponse(response.data, 'get_server_info');
   }
 
   /// 校验响应并返回数据部分
@@ -115,13 +270,15 @@ class QuickConnectService {
           // 解析失败，保持原样
         }
       } else {
-        // HTML 页面，提取可能的错误信息
+        // HTML 页面
         if (trimmed.contains('<html') || trimmed.contains('<title')) {
           throw QuickConnectException(
             'QuickConnect $command 返回 HTML 页面，请检查网络代理或 DNS 设置',
           );
         }
-        throw QuickConnectException('QuickConnect $command 响应格式异常');
+        throw QuickConnectException(
+          'QuickConnect $command 响应格式异常: ${trimmed.substring(0, trimmed.length > 100 ? 100 : trimmed.length)}',
+        );
       }
     }
 
@@ -151,205 +308,6 @@ class QuickConnectService {
     }
 
     return item;
-  }
-
-  /// 解析 QuickConnect ID，返回 NAS 可访问地址
-  ///
-  /// 自动尝试中国区和全球区服务器
-  Future<QuickConnectInfo> resolve(String quickConnectId) async {
-    final cleanId = _cleanQuickConnectId(quickConnectId);
-    if (cleanId.isEmpty) {
-      throw const QuickConnectException('QuickConnect ID 不能为空');
-    }
-
-    final preferChina = _preferChinaRegion(quickConnectId);
-
-    final dio = Dio(
-      BaseOptions(
-        connectTimeout: const Duration(seconds: 12),
-        receiveTimeout: const Duration(seconds: 20),
-        validateStatus: (status) => status != null && status < 500,
-      ),
-    );
-
-    try {
-      final servers = preferChina
-          ? [
-              (_globalUrlChina, QuickConnectRegion.china),
-              (_globalUrlGlobal, QuickConnectRegion.global),
-            ]
-          : [
-              (_globalUrlGlobal, QuickConnectRegion.global),
-              (_globalUrlChina, QuickConnectRegion.china),
-            ];
-
-      final List<String> errorMessages = [];
-
-      for (final server in servers) {
-        try {
-          final result = await _resolveWithServer(
-            dio: dio,
-            quickConnectId: cleanId,
-            globalUrl: server.$1,
-            region: server.$2,
-          );
-          return result;
-        } on QuickConnectException catch (e) {
-          errorMessages.add(e.message);
-          continue;
-        } on DioException catch (e) {
-          errorMessages.add(
-            '连接${server.$2 == QuickConnectRegion.china ? '中国区' : '全球区'}服务器失败：${e.message ?? e.toString()}',
-          );
-          continue;
-        }
-      }
-
-      final errorMsg = errorMessages.join('；');
-      throw QuickConnectException(
-        'QuickConnect 解析失败，请检查网络连接或 QuickConnect ID 是否正确。错误详情：$errorMsg',
-      );
-    } finally {
-      dio.close();
-    }
-  }
-
-  /// 使用指定全局服务器解析
-  Future<QuickConnectInfo> _resolveWithServer({
-    required Dio dio,
-    required String quickConnectId,
-    required String globalUrl,
-    required QuickConnectRegion region,
-  }) async {
-    final domainSuffix =
-        region == QuickConnectRegion.china ? _domainChina : _domainGlobal;
-
-    // 第一步：GET 请求全局服务器根路径，获取 control_host
-    final controlHost = await _getControlHost(dio, globalUrl);
-    if (controlHost.isEmpty) {
-      throw QuickConnectException(
-        '无法从${region == QuickConnectRegion.china ? '中国区' : '全球区'}服务器获取 control_host',
-      );
-    }
-
-    // 第二步：POST 请求 control_host 的 Serv.php，获取 server info
-    final serverInfo = await _requestServerInfo(
-      dio,
-      'https://$controlHost/Serv.php',
-      quickConnectId,
-    );
-
-    final env =
-        (serverInfo['env'] as Map<String, dynamic>?) ?? <String, dynamic>{};
-    final relayRegion = env['relay_region'] as String?;
-
-    // 提取 Smart DNS 直连地址
-    final smartDns =
-        (serverInfo['smartdns'] as Map<String, dynamic>?) ?? <String, dynamic>{};
-    final directHost = smartDns['host'] as String?;
-    final lanHosts = <String>[];
-    final lanList = smartDns['lan'] as List<dynamic>?;
-    if (lanList != null) {
-      for (final lan in lanList) {
-        if (lan is String && lan.isNotEmpty) {
-          lanHosts.add(lan);
-        }
-      }
-    }
-
-    // 如果有 relay_region，直接构造 URL
-    if (relayRegion != null && relayRegion.isNotEmpty) {
-      final serverUrl = 'https://$quickConnectId.$relayRegion.$domainSuffix';
-      return QuickConnectInfo(
-        serverUrl: serverUrl,
-        relayRegion: relayRegion,
-        controlHost: controlHost,
-        area: region,
-        directHost: directHost,
-        lanHosts: lanHosts,
-      );
-    }
-
-    // 第三步：请求 tunnel，拿到 relay_region
-    final tunnelInfo = await _requestTunnel(
-      dio,
-      controlHost,
-      quickConnectId,
-    );
-    final tunnelEnv =
-        (tunnelInfo['env'] as Map<String, dynamic>?) ?? <String, dynamic>{};
-    final tunnelRelayRegion = tunnelEnv['relay_region'] as String?;
-    if (tunnelRelayRegion == null || tunnelRelayRegion.isEmpty) {
-      throw const QuickConnectException('无法获取 QuickConnect relay_region');
-    }
-
-    final serverUrl = 'https://$quickConnectId.$tunnelRelayRegion.$domainSuffix';
-
-    return QuickConnectInfo(
-      serverUrl: serverUrl,
-      relayRegion: tunnelRelayRegion,
-      controlHost: controlHost,
-      area: region,
-      directHost: directHost,
-      lanHosts: lanHosts,
-    );
-  }
-
-  /// GET 请求全局服务器根路径，获取 control_host
-  Future<String> _getControlHost(Dio dio, String globalUrl) async {
-    try {
-      final globalRootUrl = globalUrl.replaceFirst('/Serv.php', '');
-      final response = await dio.get<String>(
-        globalRootUrl,
-        options: Options(
-          responseType: ResponseType.plain,
-        ),
-      );
-      final result = response.data?.trim() ?? '';
-      if (result.isEmpty) {
-        throw QuickConnectException('全局服务器返回空的 control_host');
-      }
-      return result;
-    } on DioException catch (e) {
-      throw QuickConnectException(
-        '获取 control_host 失败：${e.message ?? e.toString()}',
-      );
-    }
-  }
-
-  /// 请求 server info
-  Future<Map<String, dynamic>> _requestServerInfo(
-    Dio dio,
-    String globalUrl,
-    String quickConnectId,
-  ) async {
-    final response = await dio.post<dynamic>(
-      globalUrl,
-      data: _buildServerInfoPayload(quickConnectId),
-      options: Options(
-        headers: {'Content-Type': 'application/json'},
-        responseType: ResponseType.json,
-      ),
-    );
-    return _parseResponse(response.data, 'get_server_info');
-  }
-
-  /// 请求 tunnel
-  Future<Map<String, dynamic>> _requestTunnel(
-    Dio dio,
-    String controlHost,
-    String quickConnectId,
-  ) async {
-    final tunnelUrl = 'https://$controlHost/Serv.php';
-    final response = await dio.post<dynamic>(
-      tunnelUrl,
-      data: _buildTunnelPayload(quickConnectId),
-      options: Options(
-        headers: {'Content-Type': 'application/json'},
-        responseType: ResponseType.json,
-      ),
-    );
-    return _parseResponse(response.data, 'request_tunnel');
   }
 
   /// 判断输入是否偏向中国区

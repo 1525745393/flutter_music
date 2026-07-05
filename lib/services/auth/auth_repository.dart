@@ -14,6 +14,17 @@ class AuthException implements Exception {
   String toString() => message;
 }
 
+/// 2FA 需要验证码的异常
+class TwoFactorAuthException implements AuthException {
+  const TwoFactorAuthException(this.message);
+
+  @override
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 class AuthRepository {
   static const _keyServerUrl = 'auth.server_url';
   static const _keyUsername = 'auth.username';
@@ -24,43 +35,74 @@ class AuthRepository {
     required String username,
     required String password,
   }) async {
-    // 如果输入是 QuickConnect ID，先解析为实际访问地址
-    final actualServerUrl = await _resolveServerUrlIfNeeded(serverUrl);
+    // 如果输入是 QuickConnect ID，解析为候选地址列表
+    final candidateUrls = await _resolveServerUrlsIfNeeded(serverUrl);
 
-    final data = await _loginByApi(
-      serverUrl: actualServerUrl,
-      username: username,
-      password: password,
+    // 遍历候选地址，逐一尝试登录
+    final List<String> errorMessages = [];
+    for (final url in candidateUrls) {
+      try {
+        final data = await _loginByApi(
+          serverUrl: url,
+          username: username,
+          password: password,
+        );
+
+        final success = data['success'] == true;
+        if (!success) {
+          final errorCode =
+              (data['error'] as Map<String, dynamic>?)?['code'] as int?;
+          // 2FA 需要特殊处理，直接抛出让上层处理
+          if (errorCode == 403 || errorCode == 105) {
+            throw const TwoFactorAuthException('需要两步验证');
+          }
+          // 非成功但非2FA：记录错误，尝试下一个地址
+          errorMessages.add('${_mapLoginError(errorCode)} ($url)');
+          continue;
+        }
+
+        final sid = (data['data'] as Map<String, dynamic>?)?['sid'] as String?;
+        if (sid == null || sid.isEmpty) {
+          errorMessages.add('未获取到会话信息 ($url)');
+          continue;
+        }
+
+        // 登录成功：保存最终成功的 baseUrl，后续所有请求都用这个地址
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_keyServerUrl, url);
+        await prefs.setString(_keyUsername, username);
+        await prefs.setString(_keySessionId, sid);
+        return;
+      } on TwoFactorAuthException {
+        // 2FA 异常直接向上抛出
+        rethrow;
+      } on AuthException catch (e) {
+        errorMessages.add('${e.message} ($url)');
+        continue;
+      } catch (e) {
+        // 网络错误等，尝试下一个地址
+        errorMessages.add('$e ($url)');
+        continue;
+      }
+    }
+
+    // 所有候选地址都失败
+    throw AuthException(
+      '所有服务器地址均无法连接。错误详情：${errorMessages.join('；')}',
     );
-
-    final success = data['success'] == true;
-    if (!success) {
-      final errorCode =
-          (data['error'] as Map<String, dynamic>?)?['code'] as int?;
-      throw AuthException(_mapLoginError(errorCode));
-    }
-
-    final sid = (data['data'] as Map<String, dynamic>?)?['sid'] as String?;
-    if (sid == null || sid.isEmpty) {
-      throw const AuthException('登录失败：未获取到会话信息');
-    }
-
-    final prefs = await SharedPreferences.getInstance();
-    // 存储解析后的实际地址，便于后续 API 调用
-    await prefs.setString(_keyServerUrl, actualServerUrl);
-    await prefs.setString(_keyUsername, username);
-    await prefs.setString(_keySessionId, sid);
   }
 
-  /// 判断输入是否为 QuickConnect ID，如果是则解析为实际访问地址
-  Future<String> _resolveServerUrlIfNeeded(String input) async {
+  /// 判断输入是否为 QuickConnect ID，如果是则解析为候选地址列表
+  ///
+  /// 非 QuickConnect 输入直接返回原始 URL
+  Future<List<String>> _resolveServerUrlsIfNeeded(String input) async {
     if (!QuickConnectService.isQuickConnectId(input)) {
-      return input;
+      return [input];
     }
 
     final quickConnectService = QuickConnectService();
     final info = await quickConnectService.resolve(input);
-    return info.serverUrl;
+    return info.candidateUrls;
   }
 
   Future<Map<String, dynamic>> _loginByApi({
@@ -73,6 +115,42 @@ class AuthRepository {
       return await api.login(username: username, password: password);
     } on SynologyApiException catch (e) {
       throw AuthException('登录失败：${e.message}');
+    }
+  }
+
+  /// 2FA 第二步：提交验证码
+  Future<void> submitTwoFactorCode({
+    required String serverUrl,
+    required String username,
+    required String password,
+    required String otpCode,
+  }) async {
+    final api = SynologyAuthApi(serverUrl: serverUrl);
+    try {
+      final data = await api.loginWithOtp(
+        username: username,
+        password: password,
+        otpCode: otpCode,
+      );
+
+      final success = data['success'] == true;
+      if (!success) {
+        final errorCode =
+            (data['error'] as Map<String, dynamic>?)?['code'] as int?;
+        throw AuthException(_mapLoginError(errorCode));
+      }
+
+      final sid = (data['data'] as Map<String, dynamic>?)?['sid'] as String?;
+      if (sid == null || sid.isEmpty) {
+        throw const AuthException('登录失败：未获取到会话信息');
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_keyServerUrl, serverUrl);
+      await prefs.setString(_keyUsername, username);
+      await prefs.setString(_keySessionId, sid);
+    } on SynologyApiException catch (e) {
+      throw AuthException('两步验证失败：${e.message}');
     }
   }
 

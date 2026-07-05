@@ -22,6 +22,9 @@ class LoginController extends Notifier<AsyncValue<void>> {
           .login(serverUrl: serverUrl, username: username, password: password);
       state = const AsyncData(null);
       return null;
+    } on TwoFactorAuthException catch (e, st) {
+      state = AsyncError(e, st);
+      return e.message;
     } on AuthException catch (e, st) {
       state = AsyncError(e, st);
       return e.message;
@@ -42,6 +45,32 @@ class LoginController extends Notifier<AsyncValue<void>> {
         return 'SSL 证书验证失败，请使用正确的 HTTPS 地址';
       }
       return '登录失败：$e';
+    }
+  }
+
+  /// 2FA 第二步：提交验证码
+  Future<String?> submitTwoFactorCode({
+    required String serverUrl,
+    required String username,
+    required String password,
+    required String otpCode,
+  }) async {
+    state = const AsyncLoading();
+    try {
+      await ref.read(authRepositoryProvider).submitTwoFactorCode(
+            serverUrl: serverUrl,
+            username: username,
+            password: password,
+            otpCode: otpCode,
+          );
+      state = const AsyncData(null);
+      return null;
+    } on AuthException catch (e, st) {
+      state = AsyncError(e, st);
+      return e.message;
+    } catch (e, st) {
+      state = AsyncError(e, st);
+      return '两步验证失败：$e';
     }
   }
 }
