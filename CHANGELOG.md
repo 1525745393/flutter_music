@@ -1,3 +1,10 @@
+## [1.1.1](https://github.com/1525745393/flutter_music/compare/v1.1.0...v1.1.1) (2026-07-05)
+
+
+### Bug Fixes
+
+* 修复 QuickConnect ID 解析和错误提示问题 ([02f236a](https://github.com/1525745393/flutter_music/commit/02f236ac5cc64a04b36333d7e6844ed1b0537d35))
+
 # [1.1.0](https://github.com/1525745393/flutter_music/compare/v1.0.3...v1.1.0) (2026-07-05)
 
 
