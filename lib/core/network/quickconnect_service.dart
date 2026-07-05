@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 
 /// QuickConnect 解析异常
@@ -98,14 +100,39 @@ class QuickConnectService {
     dynamic responseData,
     String command,
   ) {
+    // 响应可能是 String 类型（HTML 或 JSON 字符串）
+    dynamic data = responseData;
+    if (responseData is String) {
+      final trimmed = responseData.trim();
+      if (trimmed.isEmpty) {
+        throw QuickConnectException('QuickConnect $command 响应为空');
+      }
+      // 如果看起来像 JSON，尝试解析
+      if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+        try {
+          data = jsonDecode(trimmed);
+        } catch (_) {
+          // 解析失败，保持原样
+        }
+      } else {
+        // HTML 页面，提取可能的错误信息
+        if (trimmed.contains('<html') || trimmed.contains('<title')) {
+          throw QuickConnectException(
+            'QuickConnect $command 返回 HTML 页面，请检查网络代理或 DNS 设置',
+          );
+        }
+        throw QuickConnectException('QuickConnect $command 响应格式异常');
+      }
+    }
+
     // 响应可能是单个对象，也可能是数组（取第一个）
     final Map<String, dynamic> item;
-    if (responseData is List && responseData.isNotEmpty) {
-      item = responseData[0] is Map<String, dynamic>
-          ? responseData[0] as Map<String, dynamic>
+    if (data is List && data.isNotEmpty) {
+      item = data[0] is Map<String, dynamic>
+          ? data[0] as Map<String, dynamic>
           : <String, dynamic>{};
-    } else if (responseData is Map<String, dynamic>) {
-      item = responseData;
+    } else if (data is Map<String, dynamic>) {
+      item = data;
     } else {
       throw QuickConnectException('QuickConnect $command 响应格式异常');
     }
