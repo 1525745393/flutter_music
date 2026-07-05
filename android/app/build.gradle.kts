@@ -1,3 +1,5 @@
+import java.io.File
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -27,8 +29,8 @@ android {
 
     signingConfigs {
         create("release") {
-            if (keystorePath.isNotEmpty() && java.io.File(keystorePath).exists()) {
-                storeFile = java.io.File(keystorePath)
+            if (keystorePath.isNotEmpty() && File(keystorePath).exists()) {
+                storeFile = File(keystorePath)
                 this.storePassword = storePassword
                 this.keyAlias = keyAlias
                 this.keyPassword = keyPassword
