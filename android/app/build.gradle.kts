@@ -19,6 +19,23 @@ android {
         jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
+    // 从环境变量读取签名配置，支持 CI/CD 自动签名
+    val keystorePath = System.getenv("KEYSTORE_PATH") ?: ""
+    val storePassword = System.getenv("STORE_PASSWORD") ?: ""
+    val keyAlias = System.getenv("KEY_ALIAS") ?: ""
+    val keyPassword = System.getenv("KEY_PASSWORD") ?: ""
+
+    signingConfigs {
+        create("release") {
+            if (keystorePath.isNotEmpty() && java.io.File(keystorePath).exists()) {
+                storeFile = java.io.File(keystorePath)
+                this.storePassword = storePassword
+                this.keyAlias = keyAlias
+                this.keyPassword = keyPassword
+            }
+        }
+    }
+
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.example.flutter_music"
@@ -32,9 +49,9 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // 如果存在 release 签名配置则使用，否则使用 debug 签名
+            signingConfig = signingConfigs.findByName("release")
+                ?: signingConfigs.getByName("debug")
         }
     }
 }
