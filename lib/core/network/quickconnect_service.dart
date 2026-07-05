@@ -129,10 +129,7 @@ class QuickConnectService {
       ),
     );
 
-    QuickConnectException? lastError;
-
     try {
-      // 按优先级尝试不同区域的服务器
       final servers = preferChina
           ? [
               (_globalUrlChina, QuickConnectRegion.china),
@@ -142,6 +139,8 @@ class QuickConnectService {
               (_globalUrlGlobal, QuickConnectRegion.global),
               (_globalUrlChina, QuickConnectRegion.china),
             ];
+
+      final List<String> errorMessages = [];
 
       for (final server in servers) {
         try {
@@ -153,20 +152,20 @@ class QuickConnectService {
           );
           return result;
         } on QuickConnectException catch (e) {
-          lastError = e;
-          // 继续尝试下一个服务器
+          errorMessages.add(e.message);
           continue;
         } on DioException catch (e) {
-          lastError = QuickConnectException(
+          errorMessages.add(
             '连接${server.$2 == QuickConnectRegion.china ? '中国区' : '全球区'}服务器失败：${e.message ?? e.toString()}',
           );
           continue;
         }
       }
 
-      // 所有服务器都失败了
-      throw lastError ??
-          const QuickConnectException('QuickConnect 解析失败，请检查网络连接');
+      final errorMsg = errorMessages.join('；');
+      throw QuickConnectException(
+        'QuickConnect 解析失败，请检查网络连接或 QuickConnect ID 是否正确。错误详情：$errorMsg',
+      );
     } finally {
       dio.close();
     }
