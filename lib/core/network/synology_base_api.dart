@@ -14,9 +14,21 @@ abstract class SynologyBaseApi {
   final String serverUrl;
   final Dio dio;
 
-  Map<String, dynamic> requireBody(Map<String, dynamic>? body) {
+  /// 解析响应数据为 Map，处理非 JSON 响应的情况
+  Map<String, dynamic> requireBody(dynamic body) {
     if (body == null) {
       throw const SynologyApiException('接口响应为空');
+    }
+    if (body is String) {
+      if (body.contains('<html') || body.contains('<!DOCTYPE')) {
+        throw const SynologyApiException(
+          '服务器返回了 HTML 页面，请检查服务器地址是否正确',
+        );
+      }
+      throw SynologyApiException('响应格式异常：$body');
+    }
+    if (body is! Map<String, dynamic>) {
+      throw SynologyApiException('响应类型错误：${body.runtimeType}');
     }
     return body;
   }

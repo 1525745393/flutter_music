@@ -13,7 +13,7 @@ class SynologyAuthApi extends SynologyBaseApi {
     required String password,
     String session = SynologyApiConstants.authSessionAudioStation,
   }) async {
-    final response = await dio.get<Map<String, dynamic>>(
+    final response = await dio.get(
       SynologyApiConstants.authPath,
       queryParameters: {
         'api': SynologyApiConstants.authApiName,
@@ -33,7 +33,7 @@ class SynologyAuthApi extends SynologyBaseApi {
     required String sid,
     String session = SynologyApiConstants.authSessionAudioStation,
   }) async {
-    final response = await dio.get<Map<String, dynamic>>(
+    final response = await dio.get(
       SynologyApiConstants.authPath,
       queryParameters: {
         'api': SynologyApiConstants.authApiName,

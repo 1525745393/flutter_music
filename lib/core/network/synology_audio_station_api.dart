@@ -16,7 +16,7 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     String library = SynologyApiConstants.songLibraryAll,
     String additional = SynologyApiConstants.songAdditionalTag,
   }) async {
-    final response = await dio.get<Map<String, dynamic>>(
+    final response = await dio.get(
       SynologyApiConstants.songPath,
       queryParameters: {
         'api': SynologyApiConstants.songApiName,
@@ -289,7 +289,7 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     required String sid,
     Map<String, String>? extra,
   }) async {
-    final response = await dio.get<Map<String, dynamic>>(
+    final response = await dio.get(
       path,
       queryParameters: {
         'api': api,
