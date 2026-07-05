@@ -1,3 +1,10 @@
+## [1.0.3](https://github.com/1525745393/flutter_music/compare/v1.0.2...v1.0.3) (2026-07-05)
+
+
+### Bug Fixes
+
+* 修复 Dio 响应类型转换错误，处理非 JSON 响应 ([40138af](https://github.com/1525745393/flutter_music/commit/40138afdb303b3dba8459c2aa491d2ffd3e2061c))
+
 ## [1.0.2](https://github.com/1525745393/flutter_music/compare/v1.0.1...v1.0.2) (2026-07-05)
 
 
