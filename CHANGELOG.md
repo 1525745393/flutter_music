@@ -1,3 +1,10 @@
+## [1.0.2](https://github.com/1525745393/flutter_music/compare/v1.0.1...v1.0.2) (2026-07-05)
+
+
+### Bug Fixes
+
+* 添加网络权限和安全配置，优化错误提示 ([981cd40](https://github.com/1525745393/flutter_music/commit/981cd408696e1d170c7953a76108ce9b94013b57))
+
 ## [1.0.1](https://github.com/1525745393/flutter_music/compare/v1.0.0...v1.0.1) (2026-07-05)
 
 
