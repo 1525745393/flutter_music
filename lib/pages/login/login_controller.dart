@@ -27,7 +27,7 @@ class LoginController extends Notifier<AsyncValue<void>> {
       return e.message;
     } on QuickConnectException catch (e, st) {
       state = AsyncError(e, st);
-      return 'QuickConnect 解析失败：${e.message}';
+      return e.message;
     } catch (e, st) {
       state = AsyncError(e, st);
       final errorMsg = e.toString();

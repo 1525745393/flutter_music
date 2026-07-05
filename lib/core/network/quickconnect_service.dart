@@ -194,8 +194,9 @@ class QuickConnectService {
   /// - `mynas.quickconnect.to`
   /// - `https://mynas.quickconnect.to`
   /// - `https://mynas.cnx.quickconnect.to`
+  /// - `https://quickconnect.to/mynas` (Web 门户格式)
   static String _cleanQuickConnectId(String input) {
-    var result = input.trim();
+    var result = input.trim().toLowerCase();
 
     // 去掉协议前缀
     if (result.startsWith('https://')) {
@@ -210,7 +211,15 @@ class QuickConnectService {
       result = result.substring(0, colonIndex);
     }
 
-    // 去掉路径
+    // 检查是否是 Web 门户格式：quickconnect.to/{id}
+    if (result.startsWith('quickconnect.to/')) {
+      final pathPart = result.substring('quickconnect.to/'.length);
+      // 提取第一个路径段作为 ID
+      final slashIndex = pathPart.indexOf('/');
+      return slashIndex > 0 ? pathPart.substring(0, slashIndex) : pathPart;
+    }
+
+    // 去掉路径（对于其他格式）
     final slashIndex = result.indexOf('/');
     if (slashIndex > 0) {
       result = result.substring(0, slashIndex);
@@ -220,12 +229,14 @@ class QuickConnectService {
     if (result.endsWith('.quickconnect.to')) {
       final parts = result.split('.');
       if (parts.length >= 4 && parts.last == 'to') {
-        // 格式：id.region.quickconnect.to -> 取 id
+        result = parts.first;
+      } else if (parts.length == 3) {
+        // 格式：id.quickconnect.to -> 取 id
         result = parts.first;
       }
     }
 
-    return result.toLowerCase();
+    return result;
   }
 
   /// 判断输入是否是 QuickConnect ID
