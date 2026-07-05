@@ -1,3 +1,10 @@
+## [1.2.3](https://github.com/1525745393/flutter_music/compare/v1.2.2...v1.2.3) (2026-07-05)
+
+
+### Bug Fixes
+
+* 改进响应解析，支持 String 类型响应和 HTML 检测 ([0c53de8](https://github.com/1525745393/flutter_music/commit/0c53de82428e644a36fec39be3f916e8ef39faa0))
+
 ## [1.2.2](https://github.com/1525745393/flutter_music/compare/v1.2.1...v1.2.2) (2026-07-05)
 
 
