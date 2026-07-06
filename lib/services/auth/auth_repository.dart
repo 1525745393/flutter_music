@@ -169,15 +169,22 @@ class AuthRepository {
 
   /// 判断输入是否为 QuickConnect ID，如果是则解析为候选地址列表
   ///
-  /// 非 QuickConnect 输入直接返回原始 URL
+  /// 非 QuickConnect 输入：
+  /// - 已有 http/https 前缀 → 直接返回
+  /// - 纯 IP/域名 → 自动补全 http:// 前缀
   Future<List<String>> _resolveServerUrlsIfNeeded(String input) async {
-    if (!QuickConnectService.isQuickConnectId(input)) {
-      return [input];
+    if (QuickConnectService.isQuickConnectId(input)) {
+      final quickConnectService = QuickConnectService();
+      final info = await quickConnectService.resolve(input);
+      return info.candidateUrls;
     }
 
-    final quickConnectService = QuickConnectService();
-    final info = await quickConnectService.resolve(input);
-    return info.candidateUrls;
+    // 非 QuickConnect：如果没有协议前缀，自动补全 http://
+    final lower = input.trim().toLowerCase();
+    if (!lower.startsWith('http://') && !lower.startsWith('https://')) {
+      return ['http://${input.trim()}'];
+    }
+    return [input.trim()];
   }
 
   Future<Map<String, dynamic>> _loginByApi({

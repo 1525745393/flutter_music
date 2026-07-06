@@ -427,8 +427,10 @@ class QuickConnectService {
   /// 判断输入是否是 QuickConnect ID
   ///
   /// 规则：
-  /// - 不以 http:// 或 https:// 开头
-  /// - 或者包含 quickconnect.to 或 quickconnect.cn
+  /// - 以 http:// 或 https:// 开头 → 看是否包含 quickconnect.to/.cn
+  /// - 包含点号 → 是 IP 或域名，不是 QuickConnect ID
+  /// - 包含冒号 → 可能有端口，不是 QuickConnect ID
+  /// - 纯字母数字/连字符/下划线 → 视为 QuickConnect ID
   static bool isQuickConnectId(String input) {
     final trimmed = input.trim().toLowerCase();
     if (trimmed.isEmpty) return false;
@@ -438,6 +440,13 @@ class QuickConnectService {
           trimmed.contains('quickconnect.cn');
     }
 
-    return true;
+    // 包含点号 → 是 IP 地址或域名，不是 QuickConnect ID
+    if (trimmed.contains('.')) return false;
+
+    // 包含冒号 → 可能有端口号，不是 QuickConnect ID
+    if (trimmed.contains(':')) return false;
+
+    // 纯字母数字/连字符/下划线 → 视为 QuickConnect ID
+    return RegExp(r'^[a-z0-9_-]+$').hasMatch(trimmed);
   }
 }
