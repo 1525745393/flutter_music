@@ -12,6 +12,12 @@
 .swiftpm/
 migrate_working_dir/
 
+# 临时脚本（含敏感信息，禁止提交）
+scripts/add_github_secret.py
+scripts/fix_branch_protection.py
+scripts/rerun_release_workflow.py
+scripts/update_branch_protection.py
+
 # IntelliJ related
 *.iml
 *.ipr
