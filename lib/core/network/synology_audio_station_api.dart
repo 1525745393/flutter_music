@@ -1,3 +1,5 @@
+import 'package:dio/dio.dart';
+
 import 'synology_api_constants.dart';
 import 'synology_base_api.dart';
 
@@ -40,7 +42,7 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     if (genre != null) extra['genre'] = genre;
     if (ratingFilter != null) extra['rating_filter'] = '$ratingFilter';
 
-    return _postRequest(
+    return _postBodyRequest(
       path: SynologyApiConstants.songPath,
       api: SynologyApiConstants.songApiName,
       fallbackVersion: SynologyApiConstants.songVersion,
@@ -76,7 +78,7 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     required String id,
     required int rating,
   }) async {
-    return _postRequest(
+    return _postQueryRequest(
       path: SynologyApiConstants.songPath,
       api: SynologyApiConstants.songApiName,
       fallbackVersion: SynologyApiConstants.songVersion,
@@ -278,7 +280,7 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     required String name,
     String library = SynologyApiConstants.songLibraryAll,
   }) async {
-    return _postRequest(
+    return _postQueryRequest(
       path: SynologyApiConstants.playlistPath,
       api: SynologyApiConstants.playlistApiName,
       fallbackVersion: SynologyApiConstants.playlistVersion,
@@ -294,7 +296,7 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     required String id,
     required String newName,
   }) async {
-    return _postRequest(
+    return _postQueryRequest(
       path: SynologyApiConstants.playlistPath,
       api: SynologyApiConstants.playlistApiName,
       fallbackVersion: SynologyApiConstants.playlistVersion,
@@ -309,7 +311,7 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     required String sid,
     required String id,
   }) async {
-    return _postRequest(
+    return _postQueryRequest(
       path: SynologyApiConstants.playlistPath,
       api: SynologyApiConstants.playlistApiName,
       fallbackVersion: SynologyApiConstants.playlistVersion,
@@ -327,7 +329,7 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     required String playlistId,
     required String songIdsCsv,
   }) async {
-    return _postRequest(
+    return _postQueryRequest(
       path: SynologyApiConstants.playlistPath,
       api: SynologyApiConstants.playlistApiName,
       fallbackVersion: SynologyApiConstants.playlistVersion,
@@ -361,7 +363,7 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     };
     if (songs != null) extra['songs'] = songs;
 
-    return _postRequest(
+    return _postQueryRequest(
       path: SynologyApiConstants.playlistPath,
       api: SynologyApiConstants.playlistApiName,
       fallbackVersion: SynologyApiConstants.playlistVersion,
@@ -394,7 +396,7 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     };
     if (id != null && id.isNotEmpty) extra['id'] = id;
 
-    return _postRequest(
+    return _postBodyRequest(
       path: SynologyApiConstants.folderPath,
       api: SynologyApiConstants.folderApiName,
       fallbackVersion: SynologyApiConstants.folderVersion,
@@ -415,7 +417,7 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     String sortBy = 'name',
     String sortDirection = 'ASC',
   }) async {
-    return _postRequest(
+    return _postBodyRequest(
       path: SynologyApiConstants.genrePath,
       api: SynologyApiConstants.genreApiName,
       fallbackVersion: SynologyApiConstants.genreVersion,
@@ -685,7 +687,7 @@ class SynologyAudioStationApi extends SynologyBaseApi {
 
   // ========== 内部请求方法 ==========
 
-  /// GET 请求（用于 Album、Artist、Playlist list、Cover、Lyrics、Search、Info）
+  /// GET 请求（用于 Album、Artist、Playlist list/getinfo、Cover、Lyrics、Search、Info、RemotePlayer）
   Future<Map<String, dynamic>> _getRequest({
     required String path,
     required String api,
@@ -707,8 +709,37 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     return requireBody(response);
   }
 
-  /// POST 请求（用于 Song list、Folder list、Genre list、Playlist 增删改、setrating）
-  Future<Map<String, dynamic>> _postRequest({
+  /// POST data 请求（参数放请求体，用于 Song list、Folder list、Genre list）
+  ///
+  /// 文档标注 "POST data" 的接口，参数应通过 form-urlencoded body 发送
+  Future<Map<String, dynamic>> _postBodyRequest({
+    required String path,
+    required String api,
+    required String fallbackVersion,
+    required String method,
+    required String sid,
+    Map<String, String>? extra,
+  }) async {
+    final response = await dio.post(
+      resolveApiPath(api, path),
+      data: {
+        'api': api,
+        'version': resolveApiVersion(api, fallbackVersion),
+        'method': method,
+        SynologyApiConstants.sidKey: sid,
+        ...?extra,
+      },
+      options: Options(
+        contentType: Headers.formUrlEncodedContentType,
+      ),
+    );
+    return requireBody(response);
+  }
+
+  /// POST query 请求（参数放 URL query，用于 Playlist 增删改、Song setrating）
+  ///
+  /// 文档标注 "POST query" 的接口，参数通过 URL query string 发送
+  Future<Map<String, dynamic>> _postQueryRequest({
     required String path,
     required String api,
     required String fallbackVersion,

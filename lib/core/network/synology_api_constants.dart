@@ -70,7 +70,8 @@ class SynologyApiConstants {
   // 服务器信息
   static const infoPath = '/webapi/AudioStation/info.cgi';
   static const infoApiName = 'SYNO.AudioStation.Info';
-  static const infoVersion = '1';
+  // query.cgi 返回 maxVersion=6
+  static const infoVersion = '6';
 
   // 流媒体播放（独立 API，不是 Song 的子方法）
   static const streamPath = '/webapi/AudioStation/stream.cgi';
@@ -80,7 +81,8 @@ class SynologyApiConstants {
   /// 封面图接口
   static const coverPath = '/webapi/AudioStation/cover.cgi';
   static const coverApiName = 'SYNO.AudioStation.Cover';
-  static const coverVersion = '1';
+  // query.cgi 返回 maxVersion=3
+  static const coverVersion = '3';
 
   // Remote Player API（远程播放器控制）
   static const remotePlayerPath = '/webapi/AudioStation/remote_player.cgi';
