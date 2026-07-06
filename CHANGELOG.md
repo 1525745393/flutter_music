@@ -1,3 +1,10 @@
+## [1.4.2](https://github.com/1525745393/flutter_music/compare/v1.4.1...v1.4.2) (2026-07-06)
+
+
+### Bug Fixes
+
+* 修复请求方式错误，严格对照文档 ([bfeff7d](https://github.com/1525745393/flutter_music/commit/bfeff7db3bab1b20ae882d7a74450bbdb13c7dd1))
+
 ## [1.4.1](https://github.com/1525745393/flutter_music/compare/v1.4.0...v1.4.1) (2026-07-06)
 
 
