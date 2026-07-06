@@ -33,20 +33,26 @@ jobs:
       - name: Install Flutter dependencies
         run: flutter pub get
 
-      - name: Decode Keystore
-        run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app-release.jks
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 'lts/*'
+          node-version: '20'
 
       - name: Install semantic-release
         run: |
-          npm install -g semantic-release @semantic-release/git @semantic-release/changelog @semantic-release/exec
+          npm install -g semantic-release @semantic-release/git @semantic-release/changelog @semantic-release/exec @semantic-release/github
+
+      - name: Decode Keystore
+        run: |
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app-release.jks
+            echo "Keystore decoded successfully"
+          else
+            echo "WARNING: KEYSTORE_BASE64 not set, using debug keystore"
+            cp android/app/debug.keystore android/app-release.jks || true
+          fi
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
 
       - name: Release
         env:
@@ -55,4 +61,4 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEYSTORE_PATH: ${{ github.workspace }}/android/app-release.jks
-        run: npx semantic-release
+        run: npx semantic-release --debug
