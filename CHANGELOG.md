@@ -1,3 +1,10 @@
+## [1.4.1](https://github.com/1525745393/flutter_music/compare/v1.4.0...v1.4.1) (2026-07-06)
+
+
+### Bug Fixes
+
+* 对照AudioStation接口文档全面修复API接口 ([3597eaa](https://github.com/1525745393/flutter_music/commit/3597eaae48b5fb4ef3d692128e3f2253d441ab64))
+
 # [1.4.0](https://github.com/1525745393/flutter_music/compare/v1.3.0...v1.4.0) (2026-07-06)
 
 
