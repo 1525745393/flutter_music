@@ -1,3 +1,15 @@
+# [1.4.0](https://github.com/1525745393/flutter_music/compare/v1.3.0...v1.4.0) (2026-07-06)
+
+
+### Bug Fixes
+
+* 修复登录相关问题，对照AudioStation接口文档 ([e79978d](https://github.com/1525745393/flutter_music/commit/e79978d7cda801a92d2ca10b50c1a59a85bdc70c))
+
+
+### Features
+
+* 生成项目Code Wiki文档 ([d4c3db3](https://github.com/1525745393/flutter_music/commit/d4c3db3dffa67d7aa7587dfd1fb2fbdec772175e))
+
 # [1.3.0](https://github.com/1525745393/flutter_music/compare/v1.2.7...v1.3.0) (2026-07-06)
 
 
