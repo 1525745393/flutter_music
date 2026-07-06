@@ -14,12 +14,19 @@ abstract class SynologyBaseApi {
   SynologyBaseApi({
     required String serverUrl,
     SynologyApiInfo? apiInfo,
+    String? synoToken,
   })  : serverUrl = _normalizeServerUrl(serverUrl),
         dio = DioClient(baseUrl: _normalizeServerUrl(serverUrl)).dio,
-        _apiInfo = apiInfo;
+        _apiInfo = apiInfo,
+        synoToken = synoToken;
 
   final String serverUrl;
   final Dio dio;
+
+  /// CSRF 防护令牌，登录后从响应中获取
+  ///
+  /// 官方文档：version 6+ 支持 SynoToken，后续所有请求都应携带
+  final String? synoToken;
 
   /// API 元信息（可能为 null，此时使用硬编码默认值）
   final SynologyApiInfo? _apiInfo;
@@ -100,9 +107,15 @@ abstract class SynologyBaseApi {
     return body;
   }
 
+  /// 构造完整的请求 URL，自动带上 SynoToken（如果有）
   String buildAbsoluteUrl(String path, Map<String, String> queryParameters) {
     final base = Uri.parse(serverUrl);
-    final uri = base.resolve(path).replace(queryParameters: queryParameters);
+    final params = Map<String, String>.from(queryParameters);
+    // 官方文档：SynoToken 首字母大写，用于 CSRF 防护
+    if (synoToken != null && synoToken!.isNotEmpty) {
+      params['SynoToken'] = synoToken!;
+    }
+    final uri = base.resolve(path).replace(queryParameters: params);
     return uri.toString();
   }
 

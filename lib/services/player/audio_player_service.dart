@@ -127,7 +127,10 @@ class AudioPlayerService {
     if (_serverUrl == null) {
       throw Exception('服务器URL未设置');
     }
-    final api = SynologyAudioStationApi(serverUrl: _serverUrl!);
+    final api = SynologyAudioStationApi(
+      serverUrl: _serverUrl!,
+      synoToken: _authRepository?.synoToken,
+    );
     return api.buildSmartStreamUrl(songId: songId, sid: sessionId);
   }
   

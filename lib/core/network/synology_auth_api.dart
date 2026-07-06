@@ -13,8 +13,7 @@ class SynologyAuthApi extends SynologyBaseApi {
   /// 如果 NAS 开启了两步验证，会返回 error.code: 403 或 105，
   /// 调用方需改用 [loginWithOtp] 传入 OTP 验证码。
   ///
-  /// 注意：DSM Auth API 实际使用 GET 请求（虽然文档写 POST），
-  /// AudioStation 文档的 POST 方式是针对业务接口的。
+  /// 官方文档确认：GET 请求，version=6，返回 sid/did/synotoken
   Future<Map<String, dynamic>> login({
     required String username,
     required String password,
@@ -34,8 +33,9 @@ class SynologyAuthApi extends SynologyBaseApi {
       'passwd': password,
       'session': session,
       'format': SynologyApiConstants.authFormatSid,
-      'device_name': deviceName,
+      'enable_syno_token': 'yes',
       'enable_device_token': 'yes',
+      'device_name': deviceName,
     };
     if (deviceId != null && deviceId.isNotEmpty) {
       params['device_id'] = deviceId;
@@ -44,7 +44,7 @@ class SynologyAuthApi extends SynologyBaseApi {
       params['otp_code'] = otpCode;
     }
 
-    // DSM Auth API 使用 GET 请求（向后兼容 DSM 6/7）
+    // 官方文档：GET 请求
     final response = await dio.get(
       resolveApiPath(
         SynologyApiConstants.authApiName,

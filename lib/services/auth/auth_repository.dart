@@ -30,15 +30,22 @@ class AuthRepository {
   static const _keyUsername = 'auth.username';
   static const _keySessionId = 'auth.session_id';
   static const _keyDeviceId = 'auth.device_id';
+  static const _keySynoToken = 'auth.syno_token';
 
   /// 缓存的 API 元信息（登录成功后加载）
   SynologyApiInfo? _apiInfo;
+
+  /// 缓存的 SynoToken（CSRF 防护令牌）
+  String? _synoToken;
 
   /// 2FA 临时 token（首次登录 403 时保存，提交验证码时使用）
   String? _twoFactorToken;
 
   /// 获取缓存的 API 元信息
   SynologyApiInfo? get apiInfo => _apiInfo;
+
+  /// 获取缓存的 SynoToken
+  String? get synoToken => _synoToken;
 
   Future<void> login({
     required String serverUrl,
@@ -95,6 +102,14 @@ class AuthRepository {
             (data['data'] as Map<String, dynamic>?)?['did'] as String?;
         if (did != null && did.isNotEmpty) {
           await prefs.setString(_keyDeviceId, did);
+        }
+
+        // 保存 SynoToken（CSRF 防护令牌）
+        final synoTokenValue =
+            (data['data'] as Map<String, dynamic>?)?['synotoken'] as String?;
+        if (synoTokenValue != null && synoTokenValue.isNotEmpty) {
+          _synoToken = synoTokenValue;
+          await prefs.setString(_keySynoToken, synoTokenValue);
         }
 
         // 登录成功：加载 API Info 并缓存
@@ -232,6 +247,14 @@ class AuthRepository {
         await prefs.setString(_keyDeviceId, did);
       }
 
+      // 保存 SynoToken（CSRF 防护令牌）
+      final synoTokenValue =
+          (data['data'] as Map<String, dynamic>?)?['synotoken'] as String?;
+      if (synoTokenValue != null && synoTokenValue.isNotEmpty) {
+        _synoToken = synoTokenValue;
+        await prefs.setString(_keySynoToken, synoTokenValue);
+      }
+
       // 登录成功：加载 API Info 并缓存
       await _loadApiInfo(serverUrl, sid);
 
@@ -263,12 +286,16 @@ class AuthRepository {
     if (serverUrl == null || sessionId == null) {
       return null;
     }
+    // 加载 SynoToken
+    _synoToken = prefs.getString(_keySynoToken);
     return AuthSession(serverUrl: serverUrl, sessionId: sessionId);
   }
 
   Future<void> clearSession() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_keySessionId);
+    await prefs.remove(_keySynoToken);
+    _synoToken = null;
   }
 
   String _mapLoginError(int? code) {
@@ -290,19 +317,27 @@ class AuthRepository {
         return '会话超时，请重新登录';
       case 107:
         return '会话已被其他登录踢掉';
-      // Auth 专属错误码（400+）
+      // Auth 专属错误码（400-410，官方文档定义）
       case 400:
-        return '请求参数错误（400）';
+        return '账号不存在或密码错误';
       case 401:
-        return '账号或密码错误';
+        return '账号已被禁用';
       case 402:
-        return '权限不足（402）';
+        return '权限不足，无法登录';
       case 403:
         return '需要两步验证';
       case 404:
-        return '两步验证码错误';
+        return '两步验证码错误，请重试';
+      case 406:
+        return '必须启用两步验证才能登录';
       case 407:
         return 'IP 已被封禁，请稍后重试';
+      case 408:
+        return '密码已过期且无法修改';
+      case 409:
+        return '密码已过期，请修改密码后再登录';
+      case 410:
+        return '首次登录必须修改密码';
       default:
         return '登录失败：未知错误${code == null ? '' : '（错误码 $code）'}';
     }

@@ -9,8 +9,10 @@ class SynologyApiConstants {
   static const sidKey = '_sid';
 
   // API Info（用于查询所有 API 的元信息）
-  static const apiInfoPath = '/webapi/query.cgi';
+  // 官方文档：路径固定为 /webapi/entry.cgi
+  static const apiInfoPath = '/webapi/entry.cgi';
   static const apiInfoApiName = 'SYNO.API.Info';
+  static const apiInfoVersion = '1';
 
   // Auth API
   // 注意：DSM 7+ 的 Auth API 路径是 entry.cgi，不是 auth.cgi

@@ -35,6 +35,7 @@ class LibraryRepository {
     final api = SynologyAudioStationApi(
       serverUrl: session.serverUrl,
       apiInfo: _authRepository.apiInfo,
+      synoToken: _authRepository.synoToken,
     );
     try {
       final body = await api.listSongs(sid: session.sessionId, limit: limit);
@@ -90,6 +91,7 @@ class LibraryRepository {
     final api = SynologyAudioStationApi(
       serverUrl: session.serverUrl,
       apiInfo: _authRepository.apiInfo,
+      synoToken: _authRepository.synoToken,
     );
     try {
       final body = await api.getLyrics(sid: session.sessionId, songId: songId);

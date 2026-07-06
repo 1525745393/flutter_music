@@ -696,15 +696,20 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     required String sid,
     Map<String, String>? extra,
   }) async {
+    final params = <String, String>{
+      'api': api,
+      'version': resolveApiVersion(api, fallbackVersion),
+      'method': method,
+      SynologyApiConstants.sidKey: sid,
+      ...?extra,
+    };
+    // 携带 SynoToken（CSRF 防护）
+    if (synoToken != null && synoToken!.isNotEmpty) {
+      params['SynoToken'] = synoToken!;
+    }
     final response = await dio.get(
       resolveApiPath(api, path),
-      queryParameters: {
-        'api': api,
-        'version': resolveApiVersion(api, fallbackVersion),
-        'method': method,
-        SynologyApiConstants.sidKey: sid,
-        ...?extra,
-      },
+      queryParameters: params,
     );
     return requireBody(response);
   }
@@ -720,15 +725,20 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     required String sid,
     Map<String, String>? extra,
   }) async {
+    final body = <String, String>{
+      'api': api,
+      'version': resolveApiVersion(api, fallbackVersion),
+      'method': method,
+      SynologyApiConstants.sidKey: sid,
+      ...?extra,
+    };
+    // 携带 SynoToken（CSRF 防护）
+    if (synoToken != null && synoToken!.isNotEmpty) {
+      body['SynoToken'] = synoToken!;
+    }
     final response = await dio.post(
       resolveApiPath(api, path),
-      data: {
-        'api': api,
-        'version': resolveApiVersion(api, fallbackVersion),
-        'method': method,
-        SynologyApiConstants.sidKey: sid,
-        ...?extra,
-      },
+      data: body,
       options: Options(
         contentType: Headers.formUrlEncodedContentType,
       ),
@@ -747,15 +757,20 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     required String sid,
     Map<String, String>? extra,
   }) async {
+    final params = <String, String>{
+      'api': api,
+      'version': resolveApiVersion(api, fallbackVersion),
+      'method': method,
+      SynologyApiConstants.sidKey: sid,
+      ...?extra,
+    };
+    // 携带 SynoToken（CSRF 防护）
+    if (synoToken != null && synoToken!.isNotEmpty) {
+      params['SynoToken'] = synoToken!;
+    }
     final response = await dio.post(
       resolveApiPath(api, path),
-      queryParameters: {
-        'api': api,
-        'version': resolveApiVersion(api, fallbackVersion),
-        'method': method,
-        SynologyApiConstants.sidKey: sid,
-        ...?extra,
-      },
+      queryParameters: params,
     );
     return requireBody(response);
   }
