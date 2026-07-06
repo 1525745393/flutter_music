@@ -59,10 +59,9 @@ class LibraryRepository {
           .map((map) {
             final song = SongItem.fromMap(map);
             // 构造封面图URL
-            final coverUrl = api.buildCoverUrl(
+            final coverUrl = api.buildSongCoverUrl(
               sid: session.sessionId,
               songId: song.id,
-              size: 300,
             );
             return song.copyWith(coverUrl: coverUrl);
           })

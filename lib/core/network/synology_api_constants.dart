@@ -27,7 +27,8 @@ class SynologyApiConstants {
   static const songApiName = 'SYNO.AudioStation.Song';
   static const songVersion = '3';
   static const songLibraryAll = 'all';
-  static const songAdditionalTag = 'song_tag';
+  // additional 参数：song_tag(标签) + song_audio(音频信息) + song_rating(评分)
+  static const songAdditionalAll = 'song_tag,song_audio,song_rating';
 
   static const albumPath = '/webapi/AudioStation/album.cgi';
   static const albumApiName = 'SYNO.AudioStation.Album';
@@ -35,11 +36,13 @@ class SynologyApiConstants {
 
   static const artistPath = '/webapi/AudioStation/artist.cgi';
   static const artistApiName = 'SYNO.AudioStation.Artist';
-  static const artistVersion = '3';
+  // 文档 query.cgi 返回 maxVersion=4
+  static const artistVersion = '4';
 
   static const playlistPath = '/webapi/AudioStation/playlist.cgi';
   static const playlistApiName = 'SYNO.AudioStation.Playlist';
-  static const playlistVersion = '3';
+  // 文档示例用 version=2
+  static const playlistVersion = '2';
 
   static const folderPath = '/webapi/AudioStation/folder.cgi';
   static const folderApiName = 'SYNO.AudioStation.Folder';
@@ -49,11 +52,39 @@ class SynologyApiConstants {
   static const lyricsApiName = 'SYNO.AudioStation.Lyrics';
   static const lyricsVersion = '2';
 
-  /// 封面图接口通常通过 URL 直接访问，不一定走标准 api/method 形式。
+  // 歌词搜索（依赖 AudioStation 歌词插件）
+  static const lyricsSearchPath = '/webapi/AudioStation/lyrics_search.cgi';
+  static const lyricsSearchApiName = 'SYNO.AudioStation.LyricsSearch';
+  static const lyricsSearchVersion = '2';
+
+  // 搜索接口
+  static const searchPath = '/webapi/AudioStation/search.cgi';
+  static const searchApiName = 'SYNO.AudioStation.Search';
+  static const searchVersion = '1';
+
+  // 类型列表
+  static const genrePath = '/webapi/AudioStation/genre.cgi';
+  static const genreApiName = 'SYNO.AudioStation.Genre';
+  static const genreVersion = '3';
+
+  // 服务器信息
+  static const infoPath = '/webapi/AudioStation/info.cgi';
+  static const infoApiName = 'SYNO.AudioStation.Info';
+  static const infoVersion = '1';
+
+  // 流媒体播放（独立 API，不是 Song 的子方法）
+  static const streamPath = '/webapi/AudioStation/stream.cgi';
+  static const streamApiName = 'SYNO.AudioStation.Stream';
+  static const streamVersion = '2';
+
+  /// 封面图接口
   static const coverPath = '/webapi/AudioStation/cover.cgi';
+  static const coverApiName = 'SYNO.AudioStation.Cover';
+  static const coverVersion = '1';
 
   // Remote Player API（远程播放器控制）
   static const remotePlayerPath = '/webapi/AudioStation/remote_player.cgi';
   static const remotePlayerApiName = 'SYNO.AudioStation.RemotePlayer';
-  static const remotePlayerVersion = '2';
+  // 文档 query.cgi 返回 maxVersion=3
+  static const remotePlayerVersion = '3';
 }

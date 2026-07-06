@@ -121,12 +121,14 @@ class AudioPlayerService {
   }
   
   /// 获取歌曲 URL
+  ///
+  /// 使用智能选择：整轨文件（ID含_v_）自动转码，否则直接流播放
   String _getSongUrl(String songId, String sessionId) {
     if (_serverUrl == null) {
       throw Exception('服务器URL未设置');
     }
     final api = SynologyAudioStationApi(serverUrl: _serverUrl!);
-    return api.buildSongStreamUrl(songId: songId, sid: sessionId);
+    return api.buildSmartStreamUrl(songId: songId, sid: sessionId);
   }
   
   /// 获取认证会话

@@ -3,195 +3,313 @@ import 'synology_base_api.dart';
 
 /// 群晖 Audio Station API 模块。
 ///
-/// 后续歌曲详情、歌单、专辑、封面等接口建议都放在这里。
+/// 所有接口参数严格对照 AudioStation 接口文档参考.md 实现：
+/// - GET 请求的接口：Album、Artist、Playlist list、Cover、Lyrics、Search、Info
+/// - POST 请求的接口：Song list、Folder list、Genre list、Playlist 增删改、Song setrating
 class SynologyAudioStationApi extends SynologyBaseApi {
   SynologyAudioStationApi({required super.serverUrl, super.apiInfo});
 
-  /// 获取歌曲列表（原始响应数据）。
-  ///
-  /// 这是音乐库首页最核心接口。
+  // ========== Song 歌曲 ==========
+
+  /// 获取歌曲列表（POST data，文档明确要求 POST）
   Future<Map<String, dynamic>> listSongs({
     required String sid,
+    int offset = 0,
     int limit = 100,
     String library = SynologyApiConstants.songLibraryAll,
-    String additional = SynologyApiConstants.songAdditionalTag,
+    String additional = SynologyApiConstants.songAdditionalAll,
+    String? sortBy,
+    String? sortDirection,
+    String? albumArtist,
+    String? album,
+    String? artist,
+    String? genre,
+    int? ratingFilter,
   }) async {
-    return _request(
+    final extra = <String, String>{
+      'library': library,
+      'offset': '$offset',
+      'limit': '$limit',
+      'additional': additional,
+    };
+    if (sortBy != null) extra['sort_by'] = sortBy;
+    if (sortDirection != null) extra['sort_direction'] = sortDirection;
+    if (albumArtist != null) extra['album_artist'] = albumArtist;
+    if (album != null) extra['album'] = album;
+    if (artist != null) extra['artist'] = artist;
+    if (genre != null) extra['genre'] = genre;
+    if (ratingFilter != null) extra['rating_filter'] = '$ratingFilter';
+
+    return _postRequest(
       path: SynologyApiConstants.songPath,
       api: SynologyApiConstants.songApiName,
       fallbackVersion: SynologyApiConstants.songVersion,
       method: 'list',
       sid: sid,
+      extra: extra,
+    );
+  }
+
+  /// 根据歌曲 ID 获取详细信息
+  Future<Map<String, dynamic>> getSongInfo({
+    required String sid,
+    required String id,
+  }) async {
+    return _getRequest(
+      path: SynologyApiConstants.songPath,
+      api: SynologyApiConstants.songApiName,
+      fallbackVersion: SynologyApiConstants.songVersion,
+      method: 'getinfo',
+      sid: sid,
+      extra: {
+        'id': id,
+        'additional': SynologyApiConstants.songAdditionalAll,
+      },
+    );
+  }
+
+  /// 歌曲评分（替代收藏功能，POST query）
+  ///
+  /// [rating] 0-5，0=取消评分，5=收藏
+  Future<Map<String, dynamic>> setSongRating({
+    required String sid,
+    required String id,
+    required int rating,
+  }) async {
+    return _postRequest(
+      path: SynologyApiConstants.songPath,
+      api: SynologyApiConstants.songApiName,
+      fallbackVersion: SynologyApiConstants.songVersion,
+      method: 'setrating',
+      sid: sid,
+      extra: {'id': id, 'rating': '$rating'},
+    );
+  }
+
+  // ========== Stream 歌曲播放 ==========
+
+  /// 构造歌曲流媒体 URL（用于播放器 setUrl）
+  ///
+  /// 使用独立的 SYNO.AudioStation.Stream API，而非 Song API。
+  /// 若歌曲 ID 包含 `_v_`（整轨文件），建议使用 [buildTranscodeUrl] 转码播放。
+  String buildSongStreamUrl({required String songId, required String sid}) {
+    return buildAbsoluteUrl(
+      resolveApiPath(
+        SynologyApiConstants.streamApiName,
+        SynologyApiConstants.streamPath,
+      ),
+      {
+        'api': SynologyApiConstants.streamApiName,
+        'version': resolveApiVersion(
+          SynologyApiConstants.streamApiName,
+          SynologyApiConstants.streamVersion,
+        ),
+        'method': 'stream',
+        'id': songId,
+        SynologyApiConstants.sidKey: sid,
+      },
+    );
+  }
+
+  /// 构造转码播放 URL（method=transcode，路径需加 /0.mp3）
+  ///
+  /// 适用于整轨文件（ID 含 `_v_`）或需要转码的场景
+  String buildTranscodeUrl({
+    required String songId,
+    required String sid,
+    String format = 'mp3',
+  }) {
+    // 文档：method=transcode 时路径后需添加 /0.mp3
+    final basePath = resolveApiPath(
+      SynologyApiConstants.streamApiName,
+      SynologyApiConstants.streamPath,
+    );
+    final url = buildAbsoluteUrl('$basePath/0.mp3', {
+      'api': SynologyApiConstants.streamApiName,
+      'version': resolveApiVersion(
+        SynologyApiConstants.streamApiName,
+        SynologyApiConstants.streamVersion,
+      ),
+      'method': 'transcode',
+      'id': songId,
+      'format': format,
+      SynologyApiConstants.sidKey: sid,
+    });
+    return url;
+  }
+
+  /// 智能选择播放 URL
+  ///
+  /// ID 含 `_v_` 的整轨文件强制使用转码，否则直接 stream
+  String buildSmartStreamUrl({required String songId, required String sid}) {
+    if (songId.contains('_v_')) {
+      return buildTranscodeUrl(songId: songId, sid: sid);
+    }
+    return buildSongStreamUrl(songId: songId, sid: sid);
+  }
+
+  // ========== Album 专辑 ==========
+
+  /// 获取专辑列表（GET query）
+  Future<Map<String, dynamic>> listAlbums({
+    required String sid,
+    int offset = 0,
+    int limit = 100,
+    String library = SynologyApiConstants.songLibraryAll,
+    String additional = 'avg_rating',
+    String? sortBy,
+    String? sortDirection,
+    String? filter,
+    String? artist,
+    String? genre,
+  }) async {
+    final extra = <String, String>{
+      'library': library,
+      'offset': '$offset',
+      'limit': '$limit',
+      'additional': additional,
+    };
+    if (sortBy != null) extra['sort_by'] = sortBy;
+    if (sortDirection != null) extra['sort_direction'] = sortDirection;
+    if (filter != null) extra['filter'] = filter;
+    if (artist != null) extra['artist'] = artist;
+    if (genre != null) extra['genre'] = genre;
+
+    return _getRequest(
+      path: SynologyApiConstants.albumPath,
+      api: SynologyApiConstants.albumApiName,
+      fallbackVersion: SynologyApiConstants.albumVersion,
+      method: 'list',
+      sid: sid,
+      extra: extra,
+    );
+  }
+
+  // ========== Artist 歌手 ==========
+
+  /// 获取歌手列表（GET query）
+  ///
+  /// 注意：此接口返回的是专辑艺术家列表，部分歌手可能无法从此接口获取
+  Future<Map<String, dynamic>> listArtists({
+    required String sid,
+    int offset = 0,
+    int limit = 100,
+    String library = SynologyApiConstants.songLibraryAll,
+    String additional = 'avg_rating',
+    String? genre,
+    String? sortBy,
+    String? sortDirection,
+  }) async {
+    final extra = <String, String>{
+      'library': library,
+      'offset': '$offset',
+      'limit': '$limit',
+      'additional': additional,
+    };
+    if (genre != null) extra['genre'] = genre;
+    if (sortBy != null) extra['sort_by'] = sortBy;
+    if (sortDirection != null) extra['sort_direction'] = sortDirection;
+
+    return _getRequest(
+      path: SynologyApiConstants.artistPath,
+      api: SynologyApiConstants.artistApiName,
+      fallbackVersion: SynologyApiConstants.artistVersion,
+      method: 'list',
+      sid: sid,
+      extra: extra,
+    );
+  }
+
+  // ========== Playlist 歌单 ==========
+
+  /// 获取歌单列表（GET query）
+  Future<Map<String, dynamic>> listPlaylists({
+    required String sid,
+    int offset = 0,
+    int limit = 100,
+    String library = SynologyApiConstants.songLibraryAll,
+  }) async {
+    return _getRequest(
+      path: SynologyApiConstants.playlistPath,
+      api: SynologyApiConstants.playlistApiName,
+      fallbackVersion: SynologyApiConstants.playlistVersion,
+      method: 'list',
+      sid: sid,
       extra: {
         'library': library,
+        'offset': '$offset',
         'limit': '$limit',
+      },
+    );
+  }
+
+  /// 获取歌单中的歌曲（GET query）
+  ///
+  /// additional 参数前缀为 songs_（如 songs_song_tag）
+  Future<Map<String, dynamic>> getPlaylistInfo({
+    required String sid,
+    required String id,
+    int offset = 0,
+    int limit = 100,
+    String library = SynologyApiConstants.songLibraryAll,
+    String sortDirection = 'ASC',
+    String additional = 'songs_song_tag,songs_song_audio,songs_song_rating',
+  }) async {
+    return _getRequest(
+      path: SynologyApiConstants.playlistPath,
+      api: SynologyApiConstants.playlistApiName,
+      fallbackVersion: SynologyApiConstants.playlistVersion,
+      method: 'getinfo',
+      sid: sid,
+      extra: {
+        'library': library,
+        'id': id,
+        'offset': '$offset',
+        'limit': '$limit',
+        'sort_direction': sortDirection,
         'additional': additional,
       },
     );
   }
 
-  /// 搜索歌曲（关键词）。
-  Future<Map<String, dynamic>> searchSongs({
-    required String sid,
-    required String keyword,
-    int limit = 50,
-  }) async {
-    return _request(
-      path: SynologyApiConstants.songPath,
-      api: SynologyApiConstants.songApiName,
-      fallbackVersion: SynologyApiConstants.songVersion,
-      method: 'search',
-      sid: sid,
-      extra: {
-        'keyword': keyword,
-        'limit': '$limit',
-        'additional': SynologyApiConstants.songAdditionalTag,
-      },
-    );
-  }
-
-  /// 根据歌曲 ID 获取详细信息（可用于播放页详情）。
-  Future<Map<String, dynamic>> getSongInfo({
-    required String sid,
-    required String id,
-  }) async {
-    return _request(
-      path: SynologyApiConstants.songPath,
-      api: SynologyApiConstants.songApiName,
-      fallbackVersion: SynologyApiConstants.songVersion,
-      method: 'getinfo',
-      sid: sid,
-      extra: {'id': id, 'additional': SynologyApiConstants.songAdditionalTag},
-    );
-  }
-
-  /// 获取专辑列表。
-  Future<Map<String, dynamic>> listAlbums({
-    required String sid,
-    int limit = 100,
-  }) async {
-    return _request(
-      path: SynologyApiConstants.albumPath,
-      api: SynologyApiConstants.albumApiName,
-      fallbackVersion: SynologyApiConstants.albumVersion,
-      method: 'list',
-      sid: sid,
-      extra: {'limit': '$limit'},
-    );
-  }
-
-  /// 获取专辑详情（通常包含专辑内歌曲）。
-  Future<Map<String, dynamic>> getAlbumInfo({
-    required String sid,
-    required String id,
-  }) async {
-    return _request(
-      path: SynologyApiConstants.albumPath,
-      api: SynologyApiConstants.albumApiName,
-      fallbackVersion: SynologyApiConstants.albumVersion,
-      method: 'getinfo',
-      sid: sid,
-      extra: {'id': id},
-    );
-  }
-
-  /// 获取歌手列表。
-  Future<Map<String, dynamic>> listArtists({
-    required String sid,
-    int limit = 100,
-  }) async {
-    return _request(
-      path: SynologyApiConstants.artistPath,
-      api: SynologyApiConstants.artistApiName,
-      fallbackVersion: SynologyApiConstants.artistVersion,
-      method: 'list',
-      sid: sid,
-      extra: {'limit': '$limit'},
-    );
-  }
-
-  /// 获取歌手详情（通常包含该歌手专辑/歌曲）。
-  Future<Map<String, dynamic>> getArtistInfo({
-    required String sid,
-    required String id,
-  }) async {
-    return _request(
-      path: SynologyApiConstants.artistPath,
-      api: SynologyApiConstants.artistApiName,
-      fallbackVersion: SynologyApiConstants.artistVersion,
-      method: 'getinfo',
-      sid: sid,
-      extra: {'id': id},
-    );
-  }
-
-  /// 获取歌单列表。
-  Future<Map<String, dynamic>> listPlaylists({
-    required String sid,
-    int limit = 100,
-  }) async {
-    return _request(
-      path: SynologyApiConstants.playlistPath,
-      api: SynologyApiConstants.playlistApiName,
-      fallbackVersion: SynologyApiConstants.playlistVersion,
-      method: 'list',
-      sid: sid,
-      extra: {'limit': '$limit'},
-    );
-  }
-
-  /// 获取歌单详情。
-  Future<Map<String, dynamic>> getPlaylistInfo({
-    required String sid,
-    required String id,
-  }) async {
-    return _request(
-      path: SynologyApiConstants.playlistPath,
-      api: SynologyApiConstants.playlistApiName,
-      fallbackVersion: SynologyApiConstants.playlistVersion,
-      method: 'getinfo',
-      sid: sid,
-      extra: {'id': id},
-    );
-  }
-
-  /// 创建歌单。
+  /// 创建歌单（POST query）
   Future<Map<String, dynamic>> createPlaylist({
     required String sid,
     required String name,
+    String library = SynologyApiConstants.songLibraryAll,
   }) async {
-    return _request(
+    return _postRequest(
       path: SynologyApiConstants.playlistPath,
       api: SynologyApiConstants.playlistApiName,
       fallbackVersion: SynologyApiConstants.playlistVersion,
       method: 'create',
       sid: sid,
-      extra: {'name': name},
+      extra: {'library': library, 'name': name},
     );
   }
 
-  /// 更新歌单（名称）。
-  Future<Map<String, dynamic>> updatePlaylist({
+  /// 重命名歌单（POST query）
+  Future<Map<String, dynamic>> renamePlaylist({
     required String sid,
     required String id,
-    required String name,
+    required String newName,
   }) async {
-    return _request(
+    return _postRequest(
       path: SynologyApiConstants.playlistPath,
       api: SynologyApiConstants.playlistApiName,
       fallbackVersion: SynologyApiConstants.playlistVersion,
-      method: 'update',
+      method: 'rename',
       sid: sid,
-      extra: {'id': id, 'name': name},
+      extra: {'id': id, 'new_name': newName},
     );
   }
 
-  /// 删除歌单。
+  /// 删除歌单（POST query）
   Future<Map<String, dynamic>> deletePlaylist({
     required String sid,
     required String id,
   }) async {
-    return _request(
+    return _postRequest(
       path: SynologyApiConstants.playlistPath,
       api: SynologyApiConstants.playlistApiName,
       fallbackVersion: SynologyApiConstants.playlistVersion,
@@ -201,92 +319,247 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     );
   }
 
-  /// 向歌单添加歌曲（ids 用逗号分隔）。
+  /// 向歌单添加歌曲（POST query）
+  ///
+  /// 文档：offset=-1, limit=0 表示追加到末尾
   Future<Map<String, dynamic>> addSongsToPlaylist({
     required String sid,
     required String playlistId,
     required String songIdsCsv,
   }) async {
-    return _request(
+    return _postRequest(
       path: SynologyApiConstants.playlistPath,
       api: SynologyApiConstants.playlistApiName,
       fallbackVersion: SynologyApiConstants.playlistVersion,
       method: 'updatesongs',
       sid: sid,
-      extra: {'id': playlistId, 'offset': 'end', 'songs': songIdsCsv},
+      extra: {
+        'id': playlistId,
+        'offset': '-1',
+        'limit': '0',
+        'songs': songIdsCsv,
+      },
     );
   }
 
-  /// 获取文件夹树（本地音乐目录浏览）。
+  /// 从歌单移除歌曲（POST query）
+  ///
+  /// [offset] 待移除歌曲的起始行数
+  /// [limit] 需要移除的歌曲数量
+  /// [songs] 待回溯的歌曲 ID 列表（误删恢复用，可选）
+  Future<Map<String, dynamic>> removeSongsFromPlaylist({
+    required String sid,
+    required String playlistId,
+    required int offset,
+    required int limit,
+    String? songs,
+  }) async {
+    final extra = <String, String>{
+      'id': playlistId,
+      'offset': '$offset',
+      'limit': '$limit',
+    };
+    if (songs != null) extra['songs'] = songs;
+
+    return _postRequest(
+      path: SynologyApiConstants.playlistPath,
+      api: SynologyApiConstants.playlistApiName,
+      fallbackVersion: SynologyApiConstants.playlistVersion,
+      method: 'updatesongs',
+      sid: sid,
+      extra: extra,
+    );
+  }
+
+  // ========== Folder 目录浏览 ==========
+
+  /// 获取目录列表（POST data）
   Future<Map<String, dynamic>> listFolders({
     required String sid,
     String? id,
+    int offset = 0,
+    int limit = 100,
+    String library = SynologyApiConstants.songLibraryAll,
+    String additional = 'song_tag,song_audio,song_rating',
+    String sortBy = 'song_rating',
+    String sortDirection = 'ASC',
   }) async {
-    return _request(
+    final extra = <String, String>{
+      'library': library,
+      'offset': '$offset',
+      'limit': '$limit',
+      'additional': additional,
+      'sort_by': sortBy,
+      'sort_direction': sortDirection,
+    };
+    if (id != null && id.isNotEmpty) extra['id'] = id;
+
+    return _postRequest(
       path: SynologyApiConstants.folderPath,
       api: SynologyApiConstants.folderApiName,
       fallbackVersion: SynologyApiConstants.folderVersion,
       method: 'list',
       sid: sid,
-      extra: {if (id != null && id.isNotEmpty) 'id': id},
+      extra: extra,
     );
   }
 
-  /// 获取歌词信息。
+  // ========== Genre 类型 ==========
+
+  /// 获取类型列表（POST data）
+  Future<Map<String, dynamic>> listGenres({
+    required String sid,
+    int offset = 0,
+    int limit = 100,
+    String library = SynologyApiConstants.songLibraryAll,
+    String sortBy = 'name',
+    String sortDirection = 'ASC',
+  }) async {
+    return _postRequest(
+      path: SynologyApiConstants.genrePath,
+      api: SynologyApiConstants.genreApiName,
+      fallbackVersion: SynologyApiConstants.genreVersion,
+      method: 'list',
+      sid: sid,
+      extra: {
+        'library': library,
+        'offset': '$offset',
+        'limit': '$limit',
+        'sort_by': sortBy,
+        'sort_direction': sortDirection,
+      },
+    );
+  }
+
+  // ========== Lyrics 歌词 ==========
+
+  /// 获取歌词（GET query）
   ///
-  /// 不同 DSM 版本返回字段可能不同，建议业务层做兜底解析。
+  /// 文档 method 名称为 getlyrics（非 get）
   Future<Map<String, dynamic>> getLyrics({
     required String sid,
     required String songId,
   }) async {
-    return _request(
+    return _getRequest(
       path: SynologyApiConstants.lyricsPath,
       api: SynologyApiConstants.lyricsApiName,
       fallbackVersion: SynologyApiConstants.lyricsVersion,
-      method: 'get',
+      method: 'getlyrics',
       sid: sid,
       extra: {'id': songId},
     );
   }
 
-  /// 构造歌曲流媒体 URL（用于播放器 setUrl）。
-  ///
-  /// 注：部分 DSM 配置会要求额外参数，可在此方法统一扩展。
-  String buildSongStreamUrl({required String songId, required String sid}) {
-    return buildAbsoluteUrl(
-      resolveApiPath(
-        SynologyApiConstants.songApiName,
-        SynologyApiConstants.songPath,
-      ),
-      {
-        'api': SynologyApiConstants.songApiName,
-        'version': resolveApiVersion(
-          SynologyApiConstants.songApiName,
-          SynologyApiConstants.songVersion,
-        ),
-        'method': 'stream',
-        'id': songId,
-        SynologyApiConstants.sidKey: sid,
+  /// 搜索歌词（GET query，依赖 AudioStation 歌词插件）
+  Future<Map<String, dynamic>> searchLyrics({
+    required String sid,
+    required String title,
+    required String artist,
+    int limit = 10,
+  }) async {
+    return _getRequest(
+      path: SynologyApiConstants.lyricsSearchPath,
+      api: SynologyApiConstants.lyricsSearchApiName,
+      fallbackVersion: SynologyApiConstants.lyricsSearchVersion,
+      method: 'searchlyrics',
+      sid: sid,
+      extra: {
+        'title': title,
+        'artist': artist,
+        'limit': '$limit',
+        'additional': 'full_lyrics',
       },
     );
   }
 
-  /// 构造封面 URL（可用于专辑封面、歌曲封面）。
+  // ========== Search 搜索 ==========
+
+  /// 搜索歌曲/专辑/歌手（GET query）
   ///
-  /// 封面接口不走标准 API Info 路径，直接使用常量路径。
-  String buildCoverUrl({
+  /// 使用独立的 SYNO.AudioStation.Search API
+  Future<Map<String, dynamic>> search({
     required String sid,
-    String? songId,
-    String? albumId,
-    String? artistName,
-    int size = 300,
+    required String keyword,
+    int offset = 0,
+    int limit = 50,
+    String library = SynologyApiConstants.songLibraryAll,
+    String sortBy = 'title',
+    String sortDirection = 'ASC',
+    String additional = 'song_tag,song_audio,song_rating',
+  }) async {
+    return _getRequest(
+      path: SynologyApiConstants.searchPath,
+      api: SynologyApiConstants.searchApiName,
+      fallbackVersion: SynologyApiConstants.searchVersion,
+      method: 'list',
+      sid: sid,
+      extra: {
+        'library': library,
+        'keyword': keyword,
+        'offset': '$offset',
+        'limit': '$limit',
+        'sort_by': sortBy,
+        'sort_direction': sortDirection,
+        'additional': additional,
+      },
+    );
+  }
+
+  // ========== Info 服务器信息 ==========
+
+  /// 获取服务器信息（GET query）
+  Future<Map<String, dynamic>> getInfo({required String sid}) async {
+    return _getRequest(
+      path: SynologyApiConstants.infoPath,
+      api: SynologyApiConstants.infoApiName,
+      fallbackVersion: SynologyApiConstants.infoVersion,
+      method: 'getinfo',
+      sid: sid,
+    );
+  }
+
+  // ========== Cover 封面 ==========
+
+  /// 构造歌曲封面 URL
+  String buildSongCoverUrl({required String sid, required String songId}) {
+    return buildAbsoluteUrl(SynologyApiConstants.coverPath, {
+      'api': SynologyApiConstants.coverApiName,
+      'version': SynologyApiConstants.coverVersion,
+      'method': 'getsongcover',
+      'library': SynologyApiConstants.songLibraryAll,
+      'id': songId,
+      SynologyApiConstants.sidKey: sid,
+    });
+  }
+
+  /// 构造专辑封面 URL
+  String buildAlbumCoverUrl({
+    required String sid,
+    required String albumName,
+    required String albumArtistName,
   }) {
     return buildAbsoluteUrl(SynologyApiConstants.coverPath, {
-      if (songId != null && songId.isNotEmpty) 'id': songId,
-      if (albumId != null && albumId.isNotEmpty) 'album_id': albumId,
-      if (artistName != null && artistName.isNotEmpty)
-        'artist_name': artistName,
-      'size': '$size',
+      'api': SynologyApiConstants.coverApiName,
+      'version': SynologyApiConstants.coverVersion,
+      'method': 'getcover',
+      'library': SynologyApiConstants.songLibraryAll,
+      'album_name': albumName,
+      'album_artist_name': albumArtistName,
+      SynologyApiConstants.sidKey: sid,
+    });
+  }
+
+  /// 构造歌手封面 URL
+  String buildArtistCoverUrl({
+    required String sid,
+    required String artistName,
+  }) {
+    return buildAbsoluteUrl(SynologyApiConstants.coverPath, {
+      'api': SynologyApiConstants.coverApiName,
+      'version': SynologyApiConstants.coverVersion,
+      'method': 'getcover',
+      'library': SynologyApiConstants.songLibraryAll,
+      'artist_name': artistName,
       SynologyApiConstants.sidKey: sid,
     });
   }
@@ -297,7 +570,7 @@ class SynologyAudioStationApi extends SynologyBaseApi {
   Future<Map<String, dynamic>> listRemotePlayers({
     required String sid,
   }) async {
-    return _request(
+    return _getRequest(
       path: SynologyApiConstants.remotePlayerPath,
       api: SynologyApiConstants.remotePlayerApiName,
       fallbackVersion: SynologyApiConstants.remotePlayerVersion,
@@ -312,7 +585,7 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     required String sid,
     required String playerId,
   }) async {
-    return _request(
+    return _getRequest(
       path: SynologyApiConstants.remotePlayerPath,
       api: SynologyApiConstants.remotePlayerApiName,
       fallbackVersion: SynologyApiConstants.remotePlayerVersion,
@@ -326,9 +599,6 @@ class SynologyAudioStationApi extends SynologyBaseApi {
   }
 
   /// 控制远程播放器（播放/暂停/上一首/下一首等）
-  ///
-  /// [action] 取值：play / pause / stop / next / previous / seek / volume / repeat / shuffle
-  /// [value] 可选参数（seek 为秒数，volume 为 0-100，repeat 为 0/1/2，shuffle 为 0/1）
   Future<Map<String, dynamic>> controlRemotePlayer({
     required String sid,
     required String playerId,
@@ -342,7 +612,7 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     if (value != null && value.isNotEmpty) {
       extra['value'] = value;
     }
-    return _request(
+    return _getRequest(
       path: SynologyApiConstants.remotePlayerPath,
       api: SynologyApiConstants.remotePlayerApiName,
       fallbackVersion: SynologyApiConstants.remotePlayerVersion,
@@ -413,37 +683,10 @@ class SynologyAudioStationApi extends SynologyBaseApi {
         value: '$volume',
       );
 
-  /// 快捷：设置循环模式
-  ///
-  /// [mode] 0=关闭, 1=单曲循环, 2=列表循环
-  Future<Map<String, dynamic>> remoteSetRepeat({
-    required String sid,
-    required String playerId,
-    required int mode,
-  }) =>
-      controlRemotePlayer(
-        sid: sid,
-        playerId: playerId,
-        action: 'repeat',
-        value: '$mode',
-      );
+  // ========== 内部请求方法 ==========
 
-  /// 快捷：设置随机播放
-  ///
-  /// [enable] true=开启, false=关闭
-  Future<Map<String, dynamic>> remoteSetShuffle({
-    required String sid,
-    required String playerId,
-    required bool enable,
-  }) =>
-      controlRemotePlayer(
-        sid: sid,
-        playerId: playerId,
-        action: 'shuffle',
-        value: enable ? '1' : '0',
-      );
-
-  Future<Map<String, dynamic>> _request({
+  /// GET 请求（用于 Album、Artist、Playlist list、Cover、Lyrics、Search、Info）
+  Future<Map<String, dynamic>> _getRequest({
     required String path,
     required String api,
     required String fallbackVersion,
@@ -452,6 +695,28 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     Map<String, String>? extra,
   }) async {
     final response = await dio.get(
+      resolveApiPath(api, path),
+      queryParameters: {
+        'api': api,
+        'version': resolveApiVersion(api, fallbackVersion),
+        'method': method,
+        SynologyApiConstants.sidKey: sid,
+        ...?extra,
+      },
+    );
+    return requireBody(response);
+  }
+
+  /// POST 请求（用于 Song list、Folder list、Genre list、Playlist 增删改、setrating）
+  Future<Map<String, dynamic>> _postRequest({
+    required String path,
+    required String api,
+    required String fallbackVersion,
+    required String method,
+    required String sid,
+    Map<String, String>? extra,
+  }) async {
+    final response = await dio.post(
       resolveApiPath(api, path),
       queryParameters: {
         'api': api,

@@ -138,6 +138,13 @@ class AuthRepository {
         SynologyApiConstants.playlistApiName,
         SynologyApiConstants.folderApiName,
         SynologyApiConstants.lyricsApiName,
+        SynologyApiConstants.lyricsSearchApiName,
+        SynologyApiConstants.searchApiName,
+        SynologyApiConstants.genreApiName,
+        SynologyApiConstants.infoApiName,
+        SynologyApiConstants.streamApiName,
+        SynologyApiConstants.coverApiName,
+        SynologyApiConstants.remotePlayerApiName,
       ]);
       _apiInfo = apiInfo;
     } catch (_) {
