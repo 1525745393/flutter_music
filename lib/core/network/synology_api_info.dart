@@ -1,6 +1,3 @@
-import 'package:dio/dio.dart';
-
-import 'dio_client.dart';
 import 'synology_api_constants.dart';
 import 'synology_api_exception.dart';
 import 'synology_base_api.dart';

@@ -6,6 +6,7 @@ class SynologyApiException implements Exception {
     this.message, {
     this.statusCode,
     this.responseBody,
+    this.errorCode,
   });
 
   /// 错误消息
@@ -17,11 +18,17 @@ class SynologyApiException implements Exception {
   /// 原始响应体（如有，用于调试）
   final dynamic responseBody;
 
+  /// API 错误码（如有，如 100、101、401 等）
+  final int? errorCode;
+
   @override
   String toString() {
     final buffer = StringBuffer(message);
     if (statusCode != null) {
       buffer.write('（HTTP $statusCode）');
+    }
+    if (errorCode != null) {
+      buffer.write('（错误码 $errorCode）');
     }
     return buffer.toString();
   }

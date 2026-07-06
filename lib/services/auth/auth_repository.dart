@@ -2,7 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/network/synology_api.dart';
-import '../../core/network/synology_api_info.dart';
 import '../../models/auth/auth_session.dart';
 import '../../models/auth/login_draft.dart';
 
