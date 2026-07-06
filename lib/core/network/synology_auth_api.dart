@@ -1,5 +1,3 @@
-import 'package:dio/dio.dart';
-
 import 'synology_api_constants.dart';
 import 'synology_base_api.dart';
 
@@ -15,7 +13,8 @@ class SynologyAuthApi extends SynologyBaseApi {
   /// 如果 NAS 开启了两步验证，会返回 error.code: 403 或 105，
   /// 调用方需改用 [loginWithOtp] 传入 OTP 验证码。
   ///
-  /// 文档要求：POST + application/json body
+  /// 注意：DSM Auth API 实际使用 GET 请求（虽然文档写 POST），
+  /// AudioStation 文档的 POST 方式是针对业务接口的。
   Future<Map<String, dynamic>> login({
     required String username,
     required String password,
@@ -24,7 +23,7 @@ class SynologyAuthApi extends SynologyBaseApi {
     String? deviceId,
     String? otpCode,
   }) async {
-    final body = <String, String>{
+    final params = <String, String>{
       'api': SynologyApiConstants.authApiName,
       'version': resolveApiVersion(
         SynologyApiConstants.authApiName,
@@ -39,24 +38,19 @@ class SynologyAuthApi extends SynologyBaseApi {
       'enable_device_token': 'yes',
     };
     if (deviceId != null && deviceId.isNotEmpty) {
-      body['device_id'] = deviceId;
+      params['device_id'] = deviceId;
     }
     if (otpCode != null && otpCode.isNotEmpty) {
-      body['otp_code'] = otpCode;
+      params['otp_code'] = otpCode;
     }
 
-    // 文档：POST + body(application/json)
-    final response = await dio.post(
+    // DSM Auth API 使用 GET 请求（向后兼容 DSM 6/7）
+    final response = await dio.get(
       resolveApiPath(
         SynologyApiConstants.authApiName,
         SynologyApiConstants.authPath,
       ),
-      data: body,
-      // DSM 要求 form-urlencoded，不是 JSON（虽然文档写 application/json）
-      // 实际抓包确认是 application/x-www-form-urlencoded
-      options: Options(
-        contentType: Headers.formUrlEncodedContentType,
-      ),
+      queryParameters: params,
     );
     return requireBody(response);
   }
