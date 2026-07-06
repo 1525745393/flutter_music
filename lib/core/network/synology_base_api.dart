@@ -14,11 +14,10 @@ abstract class SynologyBaseApi {
   SynologyBaseApi({
     required String serverUrl,
     SynologyApiInfo? apiInfo,
-    String? synoToken,
+    this.synoToken,
   })  : serverUrl = _normalizeServerUrl(serverUrl),
         dio = DioClient(baseUrl: _normalizeServerUrl(serverUrl)).dio,
-        _apiInfo = apiInfo,
-        synoToken = synoToken;
+        _apiInfo = apiInfo;
 
   final String serverUrl;
   final Dio dio;

@@ -9,7 +9,11 @@ import 'synology_base_api.dart';
 /// - GET 请求的接口：Album、Artist、Playlist list、Cover、Lyrics、Search、Info
 /// - POST 请求的接口：Song list、Folder list、Genre list、Playlist 增删改、Song setrating
 class SynologyAudioStationApi extends SynologyBaseApi {
-  SynologyAudioStationApi({required super.serverUrl, super.apiInfo});
+  SynologyAudioStationApi({
+    required super.serverUrl,
+    super.apiInfo,
+    super.synoToken,
+  });
 
   // ========== Song 歌曲 ==========
 

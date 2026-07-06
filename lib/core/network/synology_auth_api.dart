@@ -6,7 +6,11 @@ import 'synology_base_api.dart';
 /// 只放登录/登出/会话校验等认证相关接口。
 /// 支持 2FA（两步验证）流程。
 class SynologyAuthApi extends SynologyBaseApi {
-  SynologyAuthApi({required super.serverUrl, super.apiInfo});
+  SynologyAuthApi({
+    required super.serverUrl,
+    super.apiInfo,
+    super.synoToken,
+  });
 
   /// DSM 登录，返回原始响应数据（包含 success/data/error）。
   ///
