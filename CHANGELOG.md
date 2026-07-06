@@ -1,3 +1,16 @@
+# [1.5.0](https://github.com/1525745393/flutter_music/compare/v1.4.3...v1.5.0) (2026-07-06)
+
+
+### Bug Fixes
+
+* 修复CI分析错误（synoToken参数传递） ([d357e15](https://github.com/1525745393/flutter_music/commit/d357e1547239f2480dc195bc1f6bfd260033cca1))
+
+
+### Features
+
+* 对照DSM官方登录文档全面优化Auth体系 ([c278aa4](https://github.com/1525745393/flutter_music/commit/c278aa4903bd3f91f5dfc918f12ca6e8159d5a18))
+* 生成项目Code Wiki文档 ([c5f4e23](https://github.com/1525745393/flutter_music/commit/c5f4e230aea878979ec1ce68a5dcb133753f5765))
+
 ## [1.4.3](https://github.com/1525745393/flutter_music/compare/v1.4.2...v1.4.3) (2026-07-06)
 
 
