@@ -1,3 +1,15 @@
+# [1.3.0](https://github.com/1525745393/flutter_music/compare/v1.2.7...v1.3.0) (2026-07-06)
+
+
+### Bug Fixes
+
+* 修复CI分析警告和错误 ([74219c2](https://github.com/1525745393/flutter_music/commit/74219c24260749f8911760fc5320e98f4d9d6929))
+
+
+### Features
+
+* 生成项目Code Wiki文档 ([e184806](https://github.com/1525745393/flutter_music/commit/e18480640fec141859d94857ac21b39271c8553f))
+
 ## [1.2.7](https://github.com/1525745393/flutter_music/compare/v1.2.6...v1.2.7) (2026-07-06)
 
 
