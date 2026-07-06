@@ -29,7 +29,7 @@ class SynologyAuthApi extends SynologyBaseApi {
         'format': SynologyApiConstants.authFormatSid,
       },
     );
-    return requireBody(response.data);
+    return requireBody(response);
   }
 
   /// 带 OTP 验证码的登录（用于 2FA 两步验证）。
@@ -57,7 +57,7 @@ class SynologyAuthApi extends SynologyBaseApi {
         'otp_code': otpCode,
       },
     );
-    return requireBody(response.data);
+    return requireBody(response);
   }
 
   /// 退出指定会话。
@@ -75,6 +75,6 @@ class SynologyAuthApi extends SynologyBaseApi {
         SynologyApiConstants.sidKey: sid,
       },
     );
-    return requireBody(response.data);
+    return requireBody(response);
   }
 }

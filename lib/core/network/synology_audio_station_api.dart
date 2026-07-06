@@ -28,7 +28,7 @@ class SynologyAudioStationApi extends SynologyBaseApi {
         SynologyApiConstants.sidKey: sid,
       },
     );
-    return requireBody(response.data);
+    return requireBody(response);
   }
 
   /// 搜索歌曲（关键词）。
@@ -299,6 +299,6 @@ class SynologyAudioStationApi extends SynologyBaseApi {
         ...?extra,
       },
     );
-    return requireBody(response.data);
+    return requireBody(response);
   }
 }

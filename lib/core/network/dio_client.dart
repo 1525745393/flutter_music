@@ -10,6 +10,9 @@ class DioClient {
           baseUrl: baseUrl,
           connectTimeout: const Duration(seconds: 10),
           receiveTimeout: const Duration(seconds: 20),
+          // 接受所有 HTTP 状态码，统一交给业务层处理
+          // 这样即使返回 403/401，也能读取响应体中的 JSON 错误信息
+          validateStatus: (status) => status != null,
         ),
       ) {
       // 放行所有域名的 SSL 证书校验
