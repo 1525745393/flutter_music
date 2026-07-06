@@ -32,7 +32,10 @@ class LibraryRepository {
       throw const SessionExpiredException('会话不存在，请先登录');
     }
 
-    final api = SynologyAudioStationApi(serverUrl: session.serverUrl);
+    final api = SynologyAudioStationApi(
+      serverUrl: session.serverUrl,
+      apiInfo: _authRepository.apiInfo,
+    );
     try {
       final body = await api.listSongs(sid: session.sessionId, limit: limit);
 
@@ -85,7 +88,10 @@ class LibraryRepository {
       throw const SessionExpiredException('会话不存在，请先登录');
     }
 
-    final api = SynologyAudioStationApi(serverUrl: session.serverUrl);
+    final api = SynologyAudioStationApi(
+      serverUrl: session.serverUrl,
+      apiInfo: _authRepository.apiInfo,
+    );
     try {
       final body = await api.getLyrics(sid: session.sessionId, songId: songId);
 

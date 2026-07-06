@@ -8,6 +8,10 @@ class SynologyApiConstants {
   // Common
   static const sidKey = '_sid';
 
+  // API Info（用于查询所有 API 的元信息）
+  static const apiInfoPath = '/webapi/query.cgi';
+  static const apiInfoApiName = 'SYNO.API.Info';
+
   // Auth API
   static const authPath = '/webapi/auth.cgi';
   static const authApiName = 'SYNO.API.Auth';
@@ -44,4 +48,9 @@ class SynologyApiConstants {
 
   /// 封面图接口通常通过 URL 直接访问，不一定走标准 api/method 形式。
   static const coverPath = '/webapi/AudioStation/cover.cgi';
+
+  // Remote Player API（远程播放器控制）
+  static const remotePlayerPath = '/webapi/AudioStation/remote_player.cgi';
+  static const remotePlayerApiName = 'SYNO.AudioStation.RemotePlayer';
+  static const remotePlayerVersion = '2';
 }

@@ -44,20 +44,50 @@ class QuickConnectInfo {
 /// 4. 调用方遍历候选 URL 尝试登录，第一个成功即使用
 ///
 /// 自动支持中国区 (.cn) 和全球区 (.to) fallback
+/// 域名参考：https://www.synology.com/knowledgebase/DSM/tutorial/Service_Application/What_websites_does_Synology_NAS_connect_to_when_running_services_or_updating_software
 class QuickConnectService {
   QuickConnectService();
 
-  /// 中国区全局服务地址
-  static const _globalUrlChina = 'https://global.quickconnect.cn/Serv.php';
+  // 全局服务器列表（按优先级排序）
+  static const List<String> _globalServersChina = [
+    'https://global.quickconnect.cn/Serv.php',
+    'https://cnc.quickconnect.cn/Serv.php',
+    'https://global.quickconnect.to/Serv.php',
+  ];
 
-  /// 全球区全局服务地址
-  static const _globalUrlGlobal = 'https://global.quickconnect.to/Serv.php';
+  static const List<String> _globalServersGlobal = [
+    'https://global.quickconnect.to/Serv.php',
+    'https://usc.quickconnect.to/Serv.php',
+    'https://dec.quickconnect.to/Serv.php',
+    'https://global.quickconnect.cn/Serv.php',
+  ];
 
-  /// 中国区 relay 兜底地址
-  static const _relayUrlChina = 'https://relay.quickconnect.cn';
+  // Relay 中继服务器列表（按优先级排序）
+  static const List<String> _relayServersChina = [
+    'https://relay.quickconnect.cn',
+    'https://cnp1.punch.cs.quickconnect.cn',
+    'https://relay.quickconnect.to',
+  ];
 
-  /// 全球区 relay 兜底地址
-  static const _relayUrlGlobal = 'https://relay.quickconnect.to';
+  static const List<String> _relayServersGlobal = [
+    'https://relay.quickconnect.to',
+    'https://orp1.punch.cs.quickconnect.to',
+    'https://relay.quickconnect.cn',
+  ];
+
+  // 常见区域调度节点（用于兜底构造候选地址）
+  static const List<String> _regionsChina = [
+    'cn',
+    'cnc',
+  ];
+
+  static const List<String> _regionsGlobal = [
+    'us',
+    'tw',
+    'de',
+    'eu',
+    'sg',
+  ];
 
   /// 构建 get_server_info 请求 payload
   Map<String, dynamic> _buildServerInfoPayload(String quickConnectId) {
@@ -91,9 +121,7 @@ class QuickConnectService {
 
     try {
       // 按优先级尝试不同区域的全局服务器
-      final servers = preferChina
-          ? [_globalUrlChina, _globalUrlGlobal]
-          : [_globalUrlGlobal, _globalUrlChina];
+      final servers = preferChina ? _globalServersChina : _globalServersGlobal;
 
       final List<String> errorMessages = [];
       QuickConnectInfo? lastResult;
@@ -104,6 +132,7 @@ class QuickConnectService {
             dio: dio,
             quickConnectId: cleanId,
             globalUrl: globalUrl,
+            preferChina: preferChina,
           );
           // 如果拿到了候选地址，直接返回
           if (lastResult.candidateUrls.isNotEmpty) {
@@ -142,6 +171,7 @@ class QuickConnectService {
     required Dio dio,
     required String quickConnectId,
     required String globalUrl,
+    required bool preferChina,
   }) async {
     // POST 请求 global.quickconnect.cn/Serv.php 获取 server info
     final serverInfo = await _requestServerInfo(
@@ -158,6 +188,9 @@ class QuickConnectService {
     // 判断域名后缀（根据请求的全局服务器）
     final isChina = globalUrl.contains('.quickconnect.cn');
     final domainSuffix = isChina ? 'quickconnect.cn' : 'quickconnect.to';
+
+    final relayServers =
+        preferChina ? _relayServersChina : _relayServersGlobal;
 
     final candidateUrls = <String>[];
 
@@ -194,9 +227,13 @@ class QuickConnectService {
       }
     }
 
-    // 5. relay 兜底地址
-    final relayUrl = isChina ? _relayUrlChina : _relayUrlGlobal;
-    candidateUrls.add('$relayUrl/$quickConnectId');
+    // 5. 多个 relay 兜底地址（按优先级添加）
+    for (final relayUrl in relayServers) {
+      final candidate = '$relayUrl/$quickConnectId';
+      if (!candidateUrls.contains(candidate)) {
+        candidateUrls.add(candidate);
+      }
+    }
 
     // 去重
     final uniqueUrls = candidateUrls.toSet().toList();
@@ -215,17 +252,27 @@ class QuickConnectService {
     final urls = <String>[];
 
     if (preferChina) {
-      // 中国区常见 relay_region
-      for (final region in ['cn', 'cnc']) {
+      // 中国区常见区域调度节点
+      for (final region in _regionsChina) {
         urls.add('https://$quickConnectId.$region.quickconnect.cn');
       }
-      // relay 兜底
-      urls.add('$_relayUrlChina/$quickConnectId');
+      // 中国区 relay 兜底
+      for (final relayUrl in _relayServersChina) {
+        urls.add('$relayUrl/$quickConnectId');
+      }
     }
 
-    // 全球区兜底
-    for (final region in ['us', 'tw', 'de']) {
+    // 全球区区域调度节点
+    for (final region in _regionsGlobal) {
       urls.add('https://$quickConnectId.$region.quickconnect.to');
+    }
+
+    // 全球区 relay 兜底
+    for (final relayUrl in _relayServersGlobal) {
+      final candidate = '$relayUrl/$quickConnectId';
+      if (!urls.contains(candidate)) {
+        urls.add(candidate);
+      }
     }
 
     return urls;

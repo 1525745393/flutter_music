@@ -5,7 +5,7 @@ import 'synology_base_api.dart';
 ///
 /// 后续歌曲详情、歌单、专辑、封面等接口建议都放在这里。
 class SynologyAudioStationApi extends SynologyBaseApi {
-  SynologyAudioStationApi({required super.serverUrl});
+  SynologyAudioStationApi({required super.serverUrl, super.apiInfo});
 
   /// 获取歌曲列表（原始响应数据）。
   ///
@@ -16,19 +16,18 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     String library = SynologyApiConstants.songLibraryAll,
     String additional = SynologyApiConstants.songAdditionalTag,
   }) async {
-    final response = await dio.get(
-      SynologyApiConstants.songPath,
-      queryParameters: {
-        'api': SynologyApiConstants.songApiName,
-        'method': 'list',
-        'version': SynologyApiConstants.songVersion,
+    return _request(
+      path: SynologyApiConstants.songPath,
+      api: SynologyApiConstants.songApiName,
+      fallbackVersion: SynologyApiConstants.songVersion,
+      method: 'list',
+      sid: sid,
+      extra: {
         'library': library,
         'limit': '$limit',
         'additional': additional,
-        SynologyApiConstants.sidKey: sid,
       },
     );
-    return requireBody(response);
   }
 
   /// 搜索歌曲（关键词）。
@@ -40,7 +39,7 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     return _request(
       path: SynologyApiConstants.songPath,
       api: SynologyApiConstants.songApiName,
-      version: SynologyApiConstants.songVersion,
+      fallbackVersion: SynologyApiConstants.songVersion,
       method: 'search',
       sid: sid,
       extra: {
@@ -59,7 +58,7 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     return _request(
       path: SynologyApiConstants.songPath,
       api: SynologyApiConstants.songApiName,
-      version: SynologyApiConstants.songVersion,
+      fallbackVersion: SynologyApiConstants.songVersion,
       method: 'getinfo',
       sid: sid,
       extra: {'id': id, 'additional': SynologyApiConstants.songAdditionalTag},
@@ -74,7 +73,7 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     return _request(
       path: SynologyApiConstants.albumPath,
       api: SynologyApiConstants.albumApiName,
-      version: SynologyApiConstants.albumVersion,
+      fallbackVersion: SynologyApiConstants.albumVersion,
       method: 'list',
       sid: sid,
       extra: {'limit': '$limit'},
@@ -89,7 +88,7 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     return _request(
       path: SynologyApiConstants.albumPath,
       api: SynologyApiConstants.albumApiName,
-      version: SynologyApiConstants.albumVersion,
+      fallbackVersion: SynologyApiConstants.albumVersion,
       method: 'getinfo',
       sid: sid,
       extra: {'id': id},
@@ -104,7 +103,7 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     return _request(
       path: SynologyApiConstants.artistPath,
       api: SynologyApiConstants.artistApiName,
-      version: SynologyApiConstants.artistVersion,
+      fallbackVersion: SynologyApiConstants.artistVersion,
       method: 'list',
       sid: sid,
       extra: {'limit': '$limit'},
@@ -119,7 +118,7 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     return _request(
       path: SynologyApiConstants.artistPath,
       api: SynologyApiConstants.artistApiName,
-      version: SynologyApiConstants.artistVersion,
+      fallbackVersion: SynologyApiConstants.artistVersion,
       method: 'getinfo',
       sid: sid,
       extra: {'id': id},
@@ -134,7 +133,7 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     return _request(
       path: SynologyApiConstants.playlistPath,
       api: SynologyApiConstants.playlistApiName,
-      version: SynologyApiConstants.playlistVersion,
+      fallbackVersion: SynologyApiConstants.playlistVersion,
       method: 'list',
       sid: sid,
       extra: {'limit': '$limit'},
@@ -149,7 +148,7 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     return _request(
       path: SynologyApiConstants.playlistPath,
       api: SynologyApiConstants.playlistApiName,
-      version: SynologyApiConstants.playlistVersion,
+      fallbackVersion: SynologyApiConstants.playlistVersion,
       method: 'getinfo',
       sid: sid,
       extra: {'id': id},
@@ -164,7 +163,7 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     return _request(
       path: SynologyApiConstants.playlistPath,
       api: SynologyApiConstants.playlistApiName,
-      version: SynologyApiConstants.playlistVersion,
+      fallbackVersion: SynologyApiConstants.playlistVersion,
       method: 'create',
       sid: sid,
       extra: {'name': name},
@@ -180,7 +179,7 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     return _request(
       path: SynologyApiConstants.playlistPath,
       api: SynologyApiConstants.playlistApiName,
-      version: SynologyApiConstants.playlistVersion,
+      fallbackVersion: SynologyApiConstants.playlistVersion,
       method: 'update',
       sid: sid,
       extra: {'id': id, 'name': name},
@@ -195,7 +194,7 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     return _request(
       path: SynologyApiConstants.playlistPath,
       api: SynologyApiConstants.playlistApiName,
-      version: SynologyApiConstants.playlistVersion,
+      fallbackVersion: SynologyApiConstants.playlistVersion,
       method: 'delete',
       sid: sid,
       extra: {'id': id},
@@ -211,7 +210,7 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     return _request(
       path: SynologyApiConstants.playlistPath,
       api: SynologyApiConstants.playlistApiName,
-      version: SynologyApiConstants.playlistVersion,
+      fallbackVersion: SynologyApiConstants.playlistVersion,
       method: 'updatesongs',
       sid: sid,
       extra: {'id': playlistId, 'offset': 'end', 'songs': songIdsCsv},
@@ -226,7 +225,7 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     return _request(
       path: SynologyApiConstants.folderPath,
       api: SynologyApiConstants.folderApiName,
-      version: SynologyApiConstants.folderVersion,
+      fallbackVersion: SynologyApiConstants.folderVersion,
       method: 'list',
       sid: sid,
       extra: {if (id != null && id.isNotEmpty) 'id': id},
@@ -243,7 +242,7 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     return _request(
       path: SynologyApiConstants.lyricsPath,
       api: SynologyApiConstants.lyricsApiName,
-      version: SynologyApiConstants.lyricsVersion,
+      fallbackVersion: SynologyApiConstants.lyricsVersion,
       method: 'get',
       sid: sid,
       extra: {'id': songId},
@@ -254,16 +253,27 @@ class SynologyAudioStationApi extends SynologyBaseApi {
   ///
   /// 注：部分 DSM 配置会要求额外参数，可在此方法统一扩展。
   String buildSongStreamUrl({required String songId, required String sid}) {
-    return buildAbsoluteUrl(SynologyApiConstants.songPath, {
-      'api': SynologyApiConstants.songApiName,
-      'version': SynologyApiConstants.songVersion,
-      'method': 'stream',
-      'id': songId,
-      SynologyApiConstants.sidKey: sid,
-    });
+    return buildAbsoluteUrl(
+      resolveApiPath(
+        SynologyApiConstants.songApiName,
+        SynologyApiConstants.songPath,
+      ),
+      {
+        'api': SynologyApiConstants.songApiName,
+        'version': resolveApiVersion(
+          SynologyApiConstants.songApiName,
+          SynologyApiConstants.songVersion,
+        ),
+        'method': 'stream',
+        'id': songId,
+        SynologyApiConstants.sidKey: sid,
+      },
+    );
   }
 
   /// 构造封面 URL（可用于专辑封面、歌曲封面）。
+  ///
+  /// 封面接口不走标准 API Info 路径，直接使用常量路径。
   String buildCoverUrl({
     required String sid,
     String? songId,
@@ -281,19 +291,171 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     });
   }
 
+  // ========== Remote Player（远程播放器） ==========
+
+  /// 获取远程播放器列表
+  Future<Map<String, dynamic>> listRemotePlayers({
+    required String sid,
+  }) async {
+    return _request(
+      path: SynologyApiConstants.remotePlayerPath,
+      api: SynologyApiConstants.remotePlayerApiName,
+      fallbackVersion: SynologyApiConstants.remotePlayerVersion,
+      method: 'list',
+      sid: sid,
+      extra: {'additional': 'player_status,song'},
+    );
+  }
+
+  /// 获取指定远程播放器状态
+  Future<Map<String, dynamic>> getRemotePlayerStatus({
+    required String sid,
+    required String playerId,
+  }) async {
+    return _request(
+      path: SynologyApiConstants.remotePlayerPath,
+      api: SynologyApiConstants.remotePlayerApiName,
+      fallbackVersion: SynologyApiConstants.remotePlayerVersion,
+      method: 'getstatus',
+      sid: sid,
+      extra: {
+        'id': playerId,
+        'additional': 'player_status,song',
+      },
+    );
+  }
+
+  /// 控制远程播放器（播放/暂停/上一首/下一首等）
+  ///
+  /// [action] 取值：play / pause / stop / next / previous / seek / volume / repeat / shuffle
+  /// [value] 可选参数（seek 为秒数，volume 为 0-100，repeat 为 0/1/2，shuffle 为 0/1）
+  Future<Map<String, dynamic>> controlRemotePlayer({
+    required String sid,
+    required String playerId,
+    required String action,
+    String? value,
+  }) async {
+    final extra = <String, String>{
+      'id': playerId,
+      'action': action,
+    };
+    if (value != null && value.isNotEmpty) {
+      extra['value'] = value;
+    }
+    return _request(
+      path: SynologyApiConstants.remotePlayerPath,
+      api: SynologyApiConstants.remotePlayerApiName,
+      fallbackVersion: SynologyApiConstants.remotePlayerVersion,
+      method: 'control',
+      sid: sid,
+      extra: extra,
+    );
+  }
+
+  /// 快捷：播放
+  Future<Map<String, dynamic>> remotePlay({
+    required String sid,
+    required String playerId,
+  }) =>
+      controlRemotePlayer(sid: sid, playerId: playerId, action: 'play');
+
+  /// 快捷：暂停
+  Future<Map<String, dynamic>> remotePause({
+    required String sid,
+    required String playerId,
+  }) =>
+      controlRemotePlayer(sid: sid, playerId: playerId, action: 'pause');
+
+  /// 快捷：停止
+  Future<Map<String, dynamic>> remoteStop({
+    required String sid,
+    required String playerId,
+  }) =>
+      controlRemotePlayer(sid: sid, playerId: playerId, action: 'stop');
+
+  /// 快捷：下一首
+  Future<Map<String, dynamic>> remoteNext({
+    required String sid,
+    required String playerId,
+  }) =>
+      controlRemotePlayer(sid: sid, playerId: playerId, action: 'next');
+
+  /// 快捷：上一首
+  Future<Map<String, dynamic>> remotePrevious({
+    required String sid,
+    required String playerId,
+  }) =>
+      controlRemotePlayer(sid: sid, playerId: playerId, action: 'previous');
+
+  /// 快捷：跳转到指定位置（秒）
+  Future<Map<String, dynamic>> remoteSeek({
+    required String sid,
+    required String playerId,
+    required int seconds,
+  }) =>
+      controlRemotePlayer(
+        sid: sid,
+        playerId: playerId,
+        action: 'seek',
+        value: '$seconds',
+      );
+
+  /// 快捷：设置音量（0-100）
+  Future<Map<String, dynamic>> remoteSetVolume({
+    required String sid,
+    required String playerId,
+    required int volume,
+  }) =>
+      controlRemotePlayer(
+        sid: sid,
+        playerId: playerId,
+        action: 'volume',
+        value: '$volume',
+      );
+
+  /// 快捷：设置循环模式
+  ///
+  /// [mode] 0=关闭, 1=单曲循环, 2=列表循环
+  Future<Map<String, dynamic>> remoteSetRepeat({
+    required String sid,
+    required String playerId,
+    required int mode,
+  }) =>
+      controlRemotePlayer(
+        sid: sid,
+        playerId: playerId,
+        action: 'repeat',
+        value: '$mode',
+      );
+
+  /// 快捷：设置随机播放
+  ///
+  /// [enable] true=开启, false=关闭
+  Future<Map<String, dynamic>> remoteSetShuffle({
+    required String sid,
+    required String playerId,
+    required bool enable,
+  }) =>
+      controlRemotePlayer(
+        sid: sid,
+        playerId: playerId,
+        action: 'shuffle',
+        value: enable ? '1' : '0',
+      );
+
   Future<Map<String, dynamic>> _request({
     required String path,
     required String api,
-    required String version,
+    required String fallbackVersion,
     required String method,
     required String sid,
     Map<String, String>? extra,
   }) async {
     final response = await dio.get(
-      path,
+      resolveApiPath(api, path),
       queryParameters: {
         'api': api,
-        'version': version,
+        'version': resolveApiVersion(api, fallbackVersion),
         'method': method,
         SynologyApiConstants.sidKey: sid,
         ...?extra,

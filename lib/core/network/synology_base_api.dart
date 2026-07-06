@@ -2,17 +2,44 @@ import 'package:dio/dio.dart';
 
 import 'dio_client.dart';
 import 'synology_api_exception.dart';
+import 'synology_api_info.dart';
 
 /// 群晖 API 基类，负责：
 /// - 复用同一套 Dio 配置
 /// - 统一响应校验和错误处理
+/// - 提供 API Version 自适应能力
 abstract class SynologyBaseApi {
-  SynologyBaseApi({required String serverUrl})
-    : serverUrl = _normalizeServerUrl(serverUrl),
-      dio = DioClient(baseUrl: _normalizeServerUrl(serverUrl)).dio;
+  SynologyBaseApi({
+    required String serverUrl,
+    SynologyApiInfo? apiInfo,
+  })  : serverUrl = _normalizeServerUrl(serverUrl),
+        dio = DioClient(baseUrl: _normalizeServerUrl(serverUrl)).dio,
+        _apiInfo = apiInfo;
 
   final String serverUrl;
   final Dio dio;
+
+  /// API 元信息（可能为 null，此时使用硬编码默认值）
+  final SynologyApiInfo? _apiInfo;
+
+  /// 获取指定 API 的推荐版本号（字符串格式）
+  ///
+  /// 如果 [_apiInfo] 可用，从缓存读取；否则使用 [fallbackVersion]
+  String resolveApiVersion(String apiName, String fallbackVersion) {
+    final info = _apiInfo;
+    if (info == null || !info.isLoaded) return fallbackVersion;
+    final fallback = int.tryParse(fallbackVersion) ?? 1;
+    return info.getApiVersion(apiName, fallback).toString();
+  }
+
+  /// 获取指定 API 的请求路径
+  ///
+  /// 如果 [_apiInfo] 可用，从缓存读取；否则使用 [fallbackPath]
+  String resolveApiPath(String apiName, String fallbackPath) {
+    final info = _apiInfo;
+    if (info == null || !info.isLoaded) return fallbackPath;
+    return info.getApiPath(apiName, fallbackPath);
+  }
 
   /// 校验并解析响应数据为 Map
   ///

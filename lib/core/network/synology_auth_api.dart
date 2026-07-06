@@ -6,7 +6,7 @@ import 'synology_base_api.dart';
 /// 只放登录/登出/会话校验等认证相关接口。
 /// 支持 2FA（两步验证）流程。
 class SynologyAuthApi extends SynologyBaseApi {
-  SynologyAuthApi({required super.serverUrl});
+  SynologyAuthApi({required super.serverUrl, super.apiInfo});
 
   /// DSM 登录，返回原始响应数据（包含 success/data/error）。
   ///
@@ -18,10 +18,16 @@ class SynologyAuthApi extends SynologyBaseApi {
     String session = SynologyApiConstants.authSessionAudioStation,
   }) async {
     final response = await dio.get(
-      SynologyApiConstants.authPath,
+      resolveApiPath(
+        SynologyApiConstants.authApiName,
+        SynologyApiConstants.authPath,
+      ),
       queryParameters: {
         'api': SynologyApiConstants.authApiName,
-        'version': SynologyApiConstants.authVersion,
+        'version': resolveApiVersion(
+          SynologyApiConstants.authApiName,
+          SynologyApiConstants.authVersion,
+        ),
         'method': 'login',
         'account': username,
         'passwd': password,
@@ -45,10 +51,16 @@ class SynologyAuthApi extends SynologyBaseApi {
     String session = SynologyApiConstants.authSessionAudioStation,
   }) async {
     final response = await dio.get(
-      SynologyApiConstants.authPath,
+      resolveApiPath(
+        SynologyApiConstants.authApiName,
+        SynologyApiConstants.authPath,
+      ),
       queryParameters: {
         'api': SynologyApiConstants.authApiName,
-        'version': SynologyApiConstants.authVersion,
+        'version': resolveApiVersion(
+          SynologyApiConstants.authApiName,
+          SynologyApiConstants.authVersion,
+        ),
         'method': 'login',
         'account': username,
         'passwd': password,
@@ -66,13 +78,87 @@ class SynologyAuthApi extends SynologyBaseApi {
     String session = SynologyApiConstants.authSessionAudioStation,
   }) async {
     final response = await dio.get(
-      SynologyApiConstants.authPath,
+      resolveApiPath(
+        SynologyApiConstants.authApiName,
+        SynologyApiConstants.authPath,
+      ),
       queryParameters: {
         'api': SynologyApiConstants.authApiName,
-        'version': SynologyApiConstants.authVersion,
+        'version': resolveApiVersion(
+          SynologyApiConstants.authApiName,
+          SynologyApiConstants.authVersion,
+        ),
         'method': 'logout',
         'session': session,
         SynologyApiConstants.sidKey: sid,
+      },
+    );
+    return requireBody(response);
+  }
+
+  /// 请求第二步验证（2FA 标准流程第一步）
+  ///
+  /// 当首次登录返回 403 错误码时，调用此方法获取 deviceid，
+  /// 用于后续 SubmitSecondStep 提交验证码。
+  ///
+  /// 官方文档：DSM Login Web API Guide - RequestSecondStep
+  Future<Map<String, dynamic>> requestSecondStep({
+    required String username,
+    required String password,
+    String session = SynologyApiConstants.authSessionAudioStation,
+  }) async {
+    final response = await dio.get(
+      resolveApiPath(
+        SynologyApiConstants.authApiName,
+        SynologyApiConstants.authPath,
+      ),
+      queryParameters: {
+        'api': SynologyApiConstants.authApiName,
+        'version': resolveApiVersion(
+          SynologyApiConstants.authApiName,
+          SynologyApiConstants.authVersion,
+        ),
+        'method': 'login',
+        'account': username,
+        'passwd': password,
+        'session': session,
+        'format': SynologyApiConstants.authFormatSid,
+        'otp_code': '',
+      },
+    );
+    return requireBody(response);
+  }
+
+  /// 提交第二步验证码（2FA 标准流程第二步）
+  ///
+  /// 使用 requestSecondStep 返回的 deviceid 和用户输入的 OTP 验证码完成登录。
+  ///
+  /// 官方文档：DSM Login Web API Guide - SubmitSecondStep
+  Future<Map<String, dynamic>> submitSecondStep({
+    required String username,
+    required String password,
+    required String otpCode,
+    required String deviceId,
+    String session = SynologyApiConstants.authSessionAudioStation,
+  }) async {
+    final response = await dio.get(
+      resolveApiPath(
+        SynologyApiConstants.authApiName,
+        SynologyApiConstants.authPath,
+      ),
+      queryParameters: {
+        'api': SynologyApiConstants.authApiName,
+        'version': resolveApiVersion(
+          SynologyApiConstants.authApiName,
+          SynologyApiConstants.authVersion,
+        ),
+        'method': 'login',
+        'account': username,
+        'passwd': password,
+        'session': session,
+        'format': SynologyApiConstants.authFormatSid,
+        'otp_code': otpCode,
+        'device_id': deviceId,
       },
     );
     return requireBody(response);
