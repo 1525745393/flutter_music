@@ -1,4 +1,4 @@
-name: CI
+name: ci
 
 on:
   pull_request:
@@ -7,7 +7,7 @@ on:
     branches: [master, main, develop]
 
 jobs:
-  analyze-and-test:
+  ci:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
