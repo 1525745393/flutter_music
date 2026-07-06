@@ -1,3 +1,10 @@
+## [1.4.3](https://github.com/1525745393/flutter_music/compare/v1.4.2...v1.4.3) (2026-07-06)
+
+
+### Bug Fixes
+
+* Auth登录改回GET请求 ([83636b9](https://github.com/1525745393/flutter_music/commit/83636b94af02509204eec5762c4bb5a6e9041c46))
+
 ## [1.4.2](https://github.com/1525745393/flutter_music/compare/v1.4.1...v1.4.2) (2026-07-06)
 
 
