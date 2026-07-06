@@ -1,3 +1,10 @@
+## [1.5.1](https://github.com/1525745393/flutter_music/compare/v1.5.0...v1.5.1) (2026-07-06)
+
+
+### Bug Fixes
+
+* 修复直连IP地址无法登录的问题 ([05505b3](https://github.com/1525745393/flutter_music/commit/05505b321a4585a7dc73b65721c164defababbcc))
+
 # [1.5.0](https://github.com/1525745393/flutter_music/compare/v1.4.3...v1.5.0) (2026-07-06)
 
 
