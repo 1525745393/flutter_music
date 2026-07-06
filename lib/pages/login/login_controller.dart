@@ -52,7 +52,6 @@ class LoginController extends Notifier<AsyncValue<void>> {
   Future<String?> submitTwoFactorCode({
     required String serverUrl,
     required String username,
-    required String password,
     required String otpCode,
   }) async {
     state = const AsyncLoading();
@@ -60,7 +59,6 @@ class LoginController extends Notifier<AsyncValue<void>> {
       await ref.read(authRepositoryProvider).submitTwoFactorCode(
             serverUrl: serverUrl,
             username: username,
-            password: password,
             otpCode: otpCode,
           );
       state = const AsyncData(null);

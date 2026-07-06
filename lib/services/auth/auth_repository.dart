@@ -29,9 +29,13 @@ class AuthRepository {
   static const _keyServerUrl = 'auth.server_url';
   static const _keyUsername = 'auth.username';
   static const _keySessionId = 'auth.session_id';
+  static const _keyDeviceId = 'auth.device_id';
 
   /// 缓存的 API 元信息（登录成功后加载）
   SynologyApiInfo? _apiInfo;
+
+  /// 2FA 临时 token（首次登录 403 时保存，提交验证码时使用）
+  String? _twoFactorToken;
 
   /// 获取缓存的 API 元信息
   SynologyApiInfo? get apiInfo => _apiInfo;
@@ -41,6 +45,10 @@ class AuthRepository {
     required String username,
     required String password,
   }) async {
+    // 读取保存的 device_id
+    final prefs = await SharedPreferences.getInstance();
+    final savedDeviceId = prefs.getString(_keyDeviceId);
+
     // 如果输入是 QuickConnect ID，解析为候选地址列表
     final candidateUrls = await _resolveServerUrlsIfNeeded(serverUrl);
 
@@ -52,14 +60,23 @@ class AuthRepository {
           serverUrl: url,
           username: username,
           password: password,
+          deviceId: savedDeviceId,
         );
 
         final success = data['success'] == true;
         if (!success) {
           final errorCode =
               (data['error'] as Map<String, dynamic>?)?['code'] as int?;
-          // 2FA 需要特殊处理，直接抛出让上层处理
+          // 2FA 需要特殊处理：保存 token，抛出让上层处理
           if (errorCode == 403 || errorCode == 105) {
+            // 从错误响应中提取 token（AudioStation 文档版 2FA 流程）
+            final errorData =
+                (data['error'] as Map<String, dynamic>?)?['errors']
+                    as Map<String, dynamic>?;
+            final token = errorData?['token'] as String?;
+            if (token != null && token.isNotEmpty) {
+              _twoFactorToken = token;
+            }
             throw const TwoFactorAuthException('需要两步验证');
           }
           // 非成功但非2FA：记录错误，尝试下一个地址
@@ -73,11 +90,17 @@ class AuthRepository {
           continue;
         }
 
+        // 保存 device_id（did），下次登录时带上
+        final did =
+            (data['data'] as Map<String, dynamic>?)?['did'] as String?;
+        if (did != null && did.isNotEmpty) {
+          await prefs.setString(_keyDeviceId, did);
+        }
+
         // 登录成功：加载 API Info 并缓存
         await _loadApiInfo(url, sid);
 
         // 保存最终成功的 baseUrl，后续所有请求都用这个地址
-        final prefs = await SharedPreferences.getInstance();
         await prefs.setString(_keyServerUrl, url);
         await prefs.setString(_keyUsername, username);
         await prefs.setString(_keySessionId, sid);
@@ -139,10 +162,17 @@ class AuthRepository {
     required String serverUrl,
     required String username,
     required String password,
+    String? deviceId,
+    String? otpCode,
   }) async {
     final api = SynologyAuthApi(serverUrl: serverUrl);
     try {
-      return await api.login(username: username, password: password);
+      return await api.login(
+        username: username,
+        password: password,
+        deviceId: deviceId,
+        otpCode: otpCode,
+      );
     } on SynologyApiException catch (e) {
       throw AuthException('登录失败：${e.message}');
     }
@@ -150,46 +180,31 @@ class AuthRepository {
 
   /// 2FA 第二步：提交验证码
   ///
-  /// 优先尝试标准 SubmitSecondStep 流程，失败则 fallback 到 otp_code 简化方式
+  /// AudioStation 文档版流程：
+  /// 1. 首次登录返回 403，错误响应中包含 token
+  /// 2. 第二次登录时 passwd 填这个 token，同时传入 otp_code
   Future<void> submitTwoFactorCode({
     required String serverUrl,
     required String username,
-    required String password,
     required String otpCode,
   }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedDeviceId = prefs.getString(_keyDeviceId);
+
+    // 使用保存的 token 作为密码（AudioStation 文档版 2FA 流程）
+    final token = _twoFactorToken;
+    if (token == null || token.isEmpty) {
+      throw const AuthException('两步验证失败：未获取到验证令牌，请重新登录');
+    }
+
     final api = SynologyAuthApi(serverUrl: serverUrl);
     try {
-      // 第一步：先尝试标准流程 - RequestSecondStep 获取 deviceid
-      String? deviceId;
-      try {
-        final step1Data = await api.requestSecondStep(
-          username: username,
-          password: password,
-        );
-        deviceId = (step1Data['data'] as Map<String, dynamic>?)?['deviceid']
-            as String?;
-      } catch (_) {
-        // RequestSecondStep 失败也没关系，继续尝试简化方式
-      }
-
-      // 第二步：根据是否拿到 deviceid 选择不同方式
-      Map<String, dynamic> data;
-      if (deviceId != null && deviceId.isNotEmpty) {
-        // 标准流程：SubmitSecondStep
-        data = await api.submitSecondStep(
-          username: username,
-          password: password,
-          otpCode: otpCode,
-          deviceId: deviceId,
-        );
-      } else {
-        // 简化方式：直接传 otp_code
-        data = await api.loginWithOtp(
-          username: username,
-          password: password,
-          otpCode: otpCode,
-        );
-      }
+      final data = await api.loginWithOtp(
+        username: username,
+        password: token,
+        otpCode: otpCode,
+        deviceId: savedDeviceId,
+      );
 
       final success = data['success'] == true;
       if (!success) {
@@ -203,13 +218,22 @@ class AuthRepository {
         throw const AuthException('登录失败：未获取到会话信息');
       }
 
+      // 保存 device_id（did）
+      final did =
+          (data['data'] as Map<String, dynamic>?)?['did'] as String?;
+      if (did != null && did.isNotEmpty) {
+        await prefs.setString(_keyDeviceId, did);
+      }
+
       // 登录成功：加载 API Info 并缓存
       await _loadApiInfo(serverUrl, sid);
 
-      final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_keyServerUrl, serverUrl);
       await prefs.setString(_keyUsername, username);
       await prefs.setString(_keySessionId, sid);
+
+      // 清除临时 token
+      _twoFactorToken = null;
     } on SynologyApiException catch (e) {
       throw AuthException('两步验证失败：${e.message}');
     }

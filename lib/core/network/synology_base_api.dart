@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 
 import 'dio_client.dart';
@@ -44,6 +46,7 @@ abstract class SynologyBaseApi {
   /// 校验并解析响应数据为 Map
   ///
   /// 会检查 HTTP 状态码和响应格式，抛出包含详细信息的异常。
+  /// 支持部分接口返回的字符串格式 JSON（AudioStation 部分接口特性）。
   Map<String, dynamic> requireBody(Response<dynamic> response) {
     final statusCode = response.statusCode;
     final body = response.data;
@@ -55,6 +58,7 @@ abstract class SynologyBaseApi {
       );
     }
 
+    // 处理字符串类型响应
     if (body is String) {
       if (body.contains('<html') || body.contains('<!DOCTYPE')) {
         throw SynologyApiException(
@@ -63,11 +67,24 @@ abstract class SynologyBaseApi {
           responseBody: body,
         );
       }
-      throw SynologyApiException(
-        '响应格式异常：$body',
-        statusCode: statusCode,
-        responseBody: body,
-      );
+      // 尝试解析为 JSON（AudioStation 部分接口返回字符串格式的 JSON）
+      try {
+        final decoded = jsonDecode(body);
+        if (decoded is Map<String, dynamic>) {
+          return decoded;
+        }
+        throw SynologyApiException(
+          '响应 JSON 格式异常：${decoded.runtimeType}',
+          statusCode: statusCode,
+          responseBody: body,
+        );
+      } on FormatException catch (e) {
+        throw SynologyApiException(
+          '响应解析失败：$e',
+          statusCode: statusCode,
+          responseBody: body,
+        );
+      }
     }
 
     if (body is! Map<String, dynamic>) {

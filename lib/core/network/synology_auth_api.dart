@@ -12,28 +12,43 @@ class SynologyAuthApi extends SynologyBaseApi {
   ///
   /// 如果 NAS 开启了两步验证，会返回 error.code: 403 或 105，
   /// 调用方需改用 [loginWithOtp] 传入 OTP 验证码。
+  ///
+  /// 参考 AudioStation 接口文档：session=audiostation, enable_device_token=yes
   Future<Map<String, dynamic>> login({
     required String username,
     required String password,
     String session = SynologyApiConstants.authSessionAudioStation,
+    String deviceName = 'FlutterMusic',
+    String? deviceId,
+    String? otpCode,
   }) async {
+    final params = <String, String>{
+      'api': SynologyApiConstants.authApiName,
+      'version': resolveApiVersion(
+        SynologyApiConstants.authApiName,
+        SynologyApiConstants.authVersion,
+      ),
+      'method': 'login',
+      'account': username,
+      'passwd': password,
+      'session': session,
+      'format': SynologyApiConstants.authFormatSid,
+      'device_name': deviceName,
+      'enable_device_token': 'yes',
+    };
+    if (deviceId != null && deviceId.isNotEmpty) {
+      params['device_id'] = deviceId;
+    }
+    if (otpCode != null && otpCode.isNotEmpty) {
+      params['otp_code'] = otpCode;
+    }
+
     final response = await dio.get(
       resolveApiPath(
         SynologyApiConstants.authApiName,
         SynologyApiConstants.authPath,
       ),
-      queryParameters: {
-        'api': SynologyApiConstants.authApiName,
-        'version': resolveApiVersion(
-          SynologyApiConstants.authApiName,
-          SynologyApiConstants.authVersion,
-        ),
-        'method': 'login',
-        'account': username,
-        'passwd': password,
-        'session': session,
-        'format': SynologyApiConstants.authFormatSid,
-      },
+      queryParameters: params,
     );
     return requireBody(response);
   }
@@ -41,35 +56,26 @@ class SynologyAuthApi extends SynologyBaseApi {
   /// 带 OTP 验证码的登录（用于 2FA 两步验证）。
   ///
   /// 当 NAS 开启两步验证时，需传入 OTP 验证码完成登录。
-  /// DSM 的 2FA 流程：
+  /// DSM 的 2FA 流程（AudioStation 文档版）：
   /// 1. 先调用普通 login，如果返回 error.code: 403 表示需要 2FA
-  /// 2. 用户输入 OTP 验证码后，调用此方法完成登录
+  /// 2. 错误响应中包含 token，第二次登录时 passwd 填这个 token
+  /// 3. 同时传入 otp_code 完成验证
+  ///
+  /// 注意：[password] 在 2FA 重试时应为首次登录返回的 token，而非原始密码
   Future<Map<String, dynamic>> loginWithOtp({
     required String username,
     required String password,
     required String otpCode,
+    String? deviceId,
     String session = SynologyApiConstants.authSessionAudioStation,
   }) async {
-    final response = await dio.get(
-      resolveApiPath(
-        SynologyApiConstants.authApiName,
-        SynologyApiConstants.authPath,
-      ),
-      queryParameters: {
-        'api': SynologyApiConstants.authApiName,
-        'version': resolveApiVersion(
-          SynologyApiConstants.authApiName,
-          SynologyApiConstants.authVersion,
-        ),
-        'method': 'login',
-        'account': username,
-        'passwd': password,
-        'session': session,
-        'format': SynologyApiConstants.authFormatSid,
-        'otp_code': otpCode,
-      },
+    return login(
+      username: username,
+      password: password,
+      session: session,
+      deviceId: deviceId,
+      otpCode: otpCode,
     );
-    return requireBody(response);
   }
 
   /// 退出指定会话。
@@ -107,26 +113,12 @@ class SynologyAuthApi extends SynologyBaseApi {
     required String password,
     String session = SynologyApiConstants.authSessionAudioStation,
   }) async {
-    final response = await dio.get(
-      resolveApiPath(
-        SynologyApiConstants.authApiName,
-        SynologyApiConstants.authPath,
-      ),
-      queryParameters: {
-        'api': SynologyApiConstants.authApiName,
-        'version': resolveApiVersion(
-          SynologyApiConstants.authApiName,
-          SynologyApiConstants.authVersion,
-        ),
-        'method': 'login',
-        'account': username,
-        'passwd': password,
-        'session': session,
-        'format': SynologyApiConstants.authFormatSid,
-        'otp_code': '',
-      },
+    return login(
+      username: username,
+      password: password,
+      session: session,
+      otpCode: '',
     );
-    return requireBody(response);
   }
 
   /// 提交第二步验证码（2FA 标准流程第二步）
@@ -141,26 +133,12 @@ class SynologyAuthApi extends SynologyBaseApi {
     required String deviceId,
     String session = SynologyApiConstants.authSessionAudioStation,
   }) async {
-    final response = await dio.get(
-      resolveApiPath(
-        SynologyApiConstants.authApiName,
-        SynologyApiConstants.authPath,
-      ),
-      queryParameters: {
-        'api': SynologyApiConstants.authApiName,
-        'version': resolveApiVersion(
-          SynologyApiConstants.authApiName,
-          SynologyApiConstants.authVersion,
-        ),
-        'method': 'login',
-        'account': username,
-        'passwd': password,
-        'session': session,
-        'format': SynologyApiConstants.authFormatSid,
-        'otp_code': otpCode,
-        'device_id': deviceId,
-      },
+    return login(
+      username: username,
+      password: password,
+      session: session,
+      deviceId: deviceId,
+      otpCode: otpCode,
     );
-    return requireBody(response);
   }
 }

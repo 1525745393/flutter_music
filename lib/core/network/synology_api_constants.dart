@@ -13,10 +13,13 @@ class SynologyApiConstants {
   static const apiInfoApiName = 'SYNO.API.Info';
 
   // Auth API
-  static const authPath = '/webapi/auth.cgi';
+  // 注意：DSM 7+ 的 Auth API 路径是 entry.cgi，不是 auth.cgi
+  // 参考 AudioStation 接口文档：SYNO.API.Auth 的 path 为 entry.cgi
+  static const authPath = '/webapi/entry.cgi';
   static const authApiName = 'SYNO.API.Auth';
   static const authVersion = '6';
-  static const authSessionAudioStation = 'AudioStation';
+  // session 值为小写 audiostation（官方文档明确）
+  static const authSessionAudioStation = 'audiostation';
   static const authFormatSid = 'sid';
 
   // Audio Station API
