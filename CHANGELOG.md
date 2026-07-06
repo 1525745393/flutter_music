@@ -1,3 +1,12 @@
+## [1.2.7](https://github.com/1525745393/flutter_music/compare/v1.2.6...v1.2.7) (2026-07-06)
+
+
+### Bug Fixes
+
+* 为checkout步骤添加GH_PAT认证，确保semantic-release可推送 ([deddb2b](https://github.com/1525745393/flutter_music/commit/deddb2b8d3f43bc9797a8d6a965210c9415bc2c4))
+* 修复Release工作流失败问题 ([34b6cf1](https://github.com/1525745393/flutter_music/commit/34b6cf162f6c772de728e619d9fc686f6ac5b581))
+* 修复音乐库403错误，优化错误处理 ([d916c95](https://github.com/1525745393/flutter_music/commit/d916c952cf056ab69b9bac85c97961a670e036c9))
+
 ## [1.2.6](https://github.com/1525745393/flutter_music/compare/v1.2.5...v1.2.6) (2026-07-05)
 
 
