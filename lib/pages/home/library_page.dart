@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../login/login_page.dart';
 import '../../services/auth/auth_repository.dart';
+import '../../services/library/library_repository.dart';
 import '../../services/library/favorites_repository.dart';
+import '../../models/library/song_item.dart';
 import '../player/player_page.dart';
 import 'library_providers.dart';
 import '../player/player_controller.dart';
@@ -18,6 +20,25 @@ class LibraryPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final songsAsync = ref.watch(songsProvider);
+
+    // 监听会话失效，自动跳转到登录页
+    ref.listen<AsyncValue<List<SongItem>>>(
+      songsProvider,
+      (previous, next) {
+        next.whenOrNull(
+          error: (error, stackTrace) {
+            if (error is SessionExpiredException) {
+              // 会话失效，跳转到登录页
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (context.mounted) {
+                  context.go(LoginPage.routePath);
+                }
+              });
+            }
+          },
+        );
+      },
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -127,22 +148,39 @@ class LibraryPage extends ConsumerWidget {
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('$error', textAlign: TextAlign.center),
-                const SizedBox(height: 12),
-                FilledButton(
-                  onPressed: () => ref.refresh(songsProvider),
-                  child: const Text('重试'),
-                ),
-              ],
+        error: (error, stack) {
+          // 会话失效时显示特殊提示
+          final isSessionExpired = error is SessionExpiredException;
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isSessionExpired ? Icons.warning_amber_rounded : Icons.error_outline,
+                    size: 48,
+                    color: isSessionExpired
+                        ? Colors.orange
+                        : Theme.of(context).colorScheme.error,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    '$error',
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  FilledButton(
+                    onPressed: isSessionExpired
+                        ? () => context.go(LoginPage.routePath)
+                        : () => ref.refresh(songsProvider),
+                    child: Text(isSessionExpired ? '去登录' : '重试'),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
