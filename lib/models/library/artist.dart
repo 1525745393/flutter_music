@@ -44,7 +44,7 @@ class Artist {
 
   /// 从 API 响应解析
   ///
-  /// 数据结构：{ name: "xxx", additional: { avg_rating: ... } }
+  /// 数据结构：{ name: "xxx", additional: { avg_rating: { rating: 5 } } }
   factory Artist.fromMap(Map<String, dynamic> map) {
     final name = (map['name'] as String?)?.trim();
     if (name == null || name.isEmpty) {
@@ -52,9 +52,11 @@ class Artist {
     }
 
     // 从 additional 中读取补充信息
+    // avg_rating 是对象格式：{ "rating": 5 }，参考 AudioStation 接口文档
     final additional = map['additional'] as Map<String, dynamic>?;
+    final avgRatingMap = additional?['avg_rating'] as Map<String, dynamic>?;
     final avgRating =
-        ((additional?['avg_rating'] as num?)?.toDouble()) ?? 0.0;
+        ((avgRatingMap?['rating'] as num?)?.toDouble()) ?? 0.0;
 
     return Artist(
       name: name,

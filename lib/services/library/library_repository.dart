@@ -221,8 +221,8 @@ class LibraryRepository {
         limit: 500,
         album: albumName,
         albumArtist: albumArtist,
-        sortBy: 'track',
-        sortDirection: 'ASC',
+        // 注意：AudioStation 文档中 sort_by 可选值为 title/name/artist/random
+        // 专辑内歌曲默认按曲目号排序，此处不指定排序方式以使用 API 默认行为
       );
 
       if (body['success'] != true) {

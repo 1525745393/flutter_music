@@ -528,14 +528,23 @@ class SynologyAudioStationApi extends SynologyBaseApi {
 
   /// 构造歌曲封面 URL
   String buildSongCoverUrl({required String sid, required String songId}) {
-    return buildAbsoluteUrl(SynologyApiConstants.coverPath, {
-      'api': SynologyApiConstants.coverApiName,
-      'version': SynologyApiConstants.coverVersion,
-      'method': 'getsongcover',
-      'library': SynologyApiConstants.songLibraryAll,
-      'id': songId,
-      SynologyApiConstants.sidKey: sid,
-    });
+    return buildAbsoluteUrl(
+      resolveApiPath(
+        SynologyApiConstants.coverApiName,
+        SynologyApiConstants.coverPath,
+      ),
+      {
+        'api': SynologyApiConstants.coverApiName,
+        'version': resolveApiVersion(
+          SynologyApiConstants.coverApiName,
+          SynologyApiConstants.coverVersion,
+        ),
+        'method': 'getsongcover',
+        'library': SynologyApiConstants.songLibraryAll,
+        'id': songId,
+        SynologyApiConstants.sidKey: sid,
+      },
+    );
   }
 
   /// 构造专辑封面 URL
@@ -544,15 +553,24 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     required String albumName,
     required String albumArtistName,
   }) {
-    return buildAbsoluteUrl(SynologyApiConstants.coverPath, {
-      'api': SynologyApiConstants.coverApiName,
-      'version': SynologyApiConstants.coverVersion,
-      'method': 'getcover',
-      'library': SynologyApiConstants.songLibraryAll,
-      'album_name': albumName,
-      'album_artist_name': albumArtistName,
-      SynologyApiConstants.sidKey: sid,
-    });
+    return buildAbsoluteUrl(
+      resolveApiPath(
+        SynologyApiConstants.coverApiName,
+        SynologyApiConstants.coverPath,
+      ),
+      {
+        'api': SynologyApiConstants.coverApiName,
+        'version': resolveApiVersion(
+          SynologyApiConstants.coverApiName,
+          SynologyApiConstants.coverVersion,
+        ),
+        'method': 'getcover',
+        'library': SynologyApiConstants.songLibraryAll,
+        'album_name': albumName,
+        'album_artist_name': albumArtistName,
+        SynologyApiConstants.sidKey: sid,
+      },
+    );
   }
 
   /// 构造歌手封面 URL
@@ -560,14 +578,23 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     required String sid,
     required String artistName,
   }) {
-    return buildAbsoluteUrl(SynologyApiConstants.coverPath, {
-      'api': SynologyApiConstants.coverApiName,
-      'version': SynologyApiConstants.coverVersion,
-      'method': 'getcover',
-      'library': SynologyApiConstants.songLibraryAll,
-      'artist_name': artistName,
-      SynologyApiConstants.sidKey: sid,
-    });
+    return buildAbsoluteUrl(
+      resolveApiPath(
+        SynologyApiConstants.coverApiName,
+        SynologyApiConstants.coverPath,
+      ),
+      {
+        'api': SynologyApiConstants.coverApiName,
+        'version': resolveApiVersion(
+          SynologyApiConstants.coverApiName,
+          SynologyApiConstants.coverVersion,
+        ),
+        'method': 'getcover',
+        'library': SynologyApiConstants.songLibraryAll,
+        'artist_name': artistName,
+        SynologyApiConstants.sidKey: sid,
+      },
+    );
   }
 
   // ========== Remote Player（远程播放器） ==========
