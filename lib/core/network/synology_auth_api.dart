@@ -1,3 +1,7 @@
+import 'dart:convert';
+
+import 'package:dio/dio.dart';
+
 import 'synology_api_constants.dart';
 import 'synology_base_api.dart';
 
@@ -17,7 +21,8 @@ class SynologyAuthApi extends SynologyBaseApi {
   /// 如果 NAS 开启了两步验证，会返回 error.code: 403 或 105，
   /// 调用方需改用 [loginWithOtp] 传入 OTP 验证码。
   ///
-  /// 官方文档确认：GET 请求，version=6，返回 sid/did/synotoken
+  /// 官方文档确认：POST 请求，version=6，返回 sid/did/synotoken
+  /// 请求体格式：application/json
   Future<Map<String, dynamic>> login({
     required String username,
     required String password,
@@ -26,12 +31,12 @@ class SynologyAuthApi extends SynologyBaseApi {
     String? deviceId,
     String? otpCode,
   }) async {
-    final params = <String, String>{
+    final params = <String, dynamic>{
       'api': SynologyApiConstants.authApiName,
-      'version': resolveApiVersion(
+      'version': int.parse(resolveApiVersion(
         SynologyApiConstants.authApiName,
         SynologyApiConstants.authVersion,
-      ),
+      )),
       'method': 'login',
       'account': username,
       'passwd': password,
@@ -48,13 +53,16 @@ class SynologyAuthApi extends SynologyBaseApi {
       params['otp_code'] = otpCode;
     }
 
-    // 官方文档：GET 请求
-    final response = await dio.get(
+    // 官方文档：POST 请求，application/json 格式
+    final response = await dio.post(
       resolveApiPath(
         SynologyApiConstants.authApiName,
         SynologyApiConstants.authPath,
       ),
-      queryParameters: params,
+      data: jsonEncode(params),
+      options: Options(
+        contentType: 'application/json',
+      ),
     );
     return requireBody(response);
   }
