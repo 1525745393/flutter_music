@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/network/synology_api.dart';
-import '../home/library_page.dart';
+import '../home/home_page.dart';
 import './login_controller.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
@@ -102,7 +102,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       return;
     }
 
-    context.go(LibraryPage.routePath);
+    context.go(HomePage.routePath);
   }
 
   @override
