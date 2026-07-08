@@ -53,17 +53,48 @@ class SynologyAuthApi extends SynologyBaseApi {
       params['otp_code'] = otpCode;
     }
 
-    // 官方文档：POST 请求，application/json 格式
-    final response = await dio.post(
-      resolveApiPath(
-        SynologyApiConstants.authApiName,
-        SynologyApiConstants.authPath,
-      ),
-      data: jsonEncode(params),
-      options: Options(
-        contentType: 'application/json',
-      ),
+    final requestPath = resolveApiPath(
+      SynologyApiConstants.authApiName,
+      SynologyApiConstants.authPath,
     );
+
+    Response<dynamic> response;
+    try {
+      response = await dio.post(
+        requestPath,
+        data: jsonEncode(params),
+        options: Options(
+          contentType: 'application/json',
+          followRedirects: false,
+          validateStatus: (status) => status != null,
+        ),
+      );
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.badResponse && e.response != null) {
+        response = e.response!;
+      } else {
+        rethrow;
+      }
+    }
+
+    // 处理重定向（3xx）：禁用自动重定向后，手动跟随重定向并保持 POST 方法
+    if (response.statusCode != null &&
+        response.statusCode! >= 300 &&
+        response.statusCode! < 400) {
+      final redirectUrl = response.headers.value('location');
+      if (redirectUrl != null && redirectUrl.isNotEmpty) {
+        response = await dio.post(
+          redirectUrl,
+          data: jsonEncode(params),
+          options: Options(
+            contentType: 'application/json',
+            followRedirects: false,
+            validateStatus: (status) => status != null,
+          ),
+        );
+      }
+    }
+
     return requireBody(response);
   }
 
