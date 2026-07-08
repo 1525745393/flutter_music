@@ -1,3 +1,10 @@
+## [1.7.1](https://github.com/1525745393/flutter_music/compare/v1.7.0...v1.7.1) (2026-07-08)
+
+
+### Bug Fixes
+
+* **auth:** 登录请求改为 POST + application/json 格式（修复登录失败） ([bb02e5d](https://github.com/1525745393/flutter_music/commit/bb02e5de646fa46ba86fdeb3c2e46f10599805b9))
+
 # [1.7.0](https://github.com/1525745393/flutter_music/compare/v1.6.0...v1.7.0) (2026-07-08)
 
 
