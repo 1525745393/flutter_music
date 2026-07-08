@@ -1,3 +1,10 @@
+# [1.7.0](https://github.com/1525745393/flutter_music/compare/v1.6.0...v1.7.0) (2026-07-08)
+
+
+### Features
+
+* 生成项目Code Wiki文档 ([83f412a](https://github.com/1525745393/flutter_music/commit/83f412a9979537f75f13884622c41e94888c5046))
+
 # [1.6.0](https://github.com/1525745393/flutter_music/compare/v1.5.1...v1.6.0) (2026-07-08)
 
 
