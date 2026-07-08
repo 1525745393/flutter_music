@@ -1,3 +1,10 @@
+## [1.7.2](https://github.com/1525745393/flutter_music/compare/v1.7.1...v1.7.2) (2026-07-08)
+
+
+### Bug Fixes
+
+* **auth:** 登录请求禁用自动重定向，手动处理3xx保持POST方法 ([f6e0b68](https://github.com/1525745393/flutter_music/commit/f6e0b6877142f8dc279c03e38cc29f6bd6d3211e))
+
 ## [1.7.1](https://github.com/1525745393/flutter_music/compare/v1.7.0...v1.7.1) (2026-07-08)
 
 
