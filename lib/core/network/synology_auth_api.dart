@@ -82,7 +82,6 @@ class SynologyAuthApi extends SynologyBaseApi {
       (_Format.getQuery, paramsStringVersion, null),
     ];
 
-    Map<String, dynamic>? lastResult;
     dynamic lastError;
 
     for (final (format, data, contentType) in formats) {
