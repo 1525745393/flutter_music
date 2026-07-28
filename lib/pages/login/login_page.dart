@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/network/synology_api.dart';
+import '../../services/auth/auth_repository.dart';
 import '../home/home_page.dart';
 import './login_controller.dart';
 
@@ -77,6 +78,121 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     super.dispose();
   }
 
+  /// 显示两步验证验证码输入对话框
+  Future<void> _showTwoFactorDialog({
+    required String serverUrl,
+    required String username,
+  }) async {
+    final codeController = TextEditingController();
+    final focusNode = FocusNode();
+
+    await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            String? errorText;
+            bool isLoading = false;
+
+            return AlertDialog(
+              title: const Text('两步验证'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('请输入 6 位验证码'),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: codeController,
+                    focusNode: focusNode,
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    decoration: InputDecoration(
+                      hintText: '请输入验证码',
+                      errorText: errorText,
+                      counterText: '',
+                    ),
+                    autofocus: true,
+                    onChanged: (value) {
+                      if (errorText != null) {
+                        setState(() => errorText = null);
+                      }
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isLoading
+                      ? null
+                      : () {
+                          Navigator.of(dialogContext).pop();
+                        },
+                  child: const Text('取消'),
+                ),
+                TextButton(
+                  onPressed: isLoading
+                      ? null
+                      : () async {
+                          final code = codeController.text.trim();
+                          if (code.isEmpty) {
+                            setState(() => errorText = '请输入验证码');
+                            return;
+                          }
+                          if (code.length != 6) {
+                            setState(() => errorText = '验证码必须是 6 位数字');
+                            return;
+                          }
+
+                          setState(() {
+                            isLoading = true;
+                            errorText = null;
+                          });
+
+                          final error = await ref
+                              .read(loginControllerProvider.notifier)
+                              .submitTwoFactorCode(
+                                serverUrl: serverUrl,
+                                username: username,
+                                otpCode: code,
+                              );
+
+                          if (!dialogContext.mounted) {
+                            return;
+                          }
+
+                          setState(() => isLoading = false);
+
+                          if (error != null) {
+                            setState(() => errorText = error);
+                            return;
+                          }
+
+                          Navigator.of(dialogContext).pop();
+                          if (mounted) {
+                            context.go(HomePage.routePath);
+                          }
+                        },
+                  child: isLoading
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('确定'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    codeController.dispose();
+    focusNode.dispose();
+  }
+
   Future<void> _onLoginPressed() async {
     if (!(_formKey.currentState?.validate() ?? false)) {
       return;
@@ -85,12 +201,16 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
 
+    final serverUrl = _serverController.text.trim();
+    final username = _usernameController.text.trim();
+    final password = _passwordController.text;
+
     final error = await ref
         .read(loginControllerProvider.notifier)
         .login(
-          serverUrl: _serverController.text.trim(),
-          username: _usernameController.text.trim(),
-          password: _passwordController.text,
+          serverUrl: serverUrl,
+          username: username,
+          password: password,
         );
 
     if (!mounted) {
@@ -98,6 +218,19 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     }
 
     if (error != null) {
+      // 检查是否为两步验证异常
+      final loginState = ref.read(loginControllerProvider);
+      final isTwoFactorError = loginState.error is TwoFactorAuthException;
+
+      if (isTwoFactorError) {
+        // 弹出两步验证对话框
+        await _showTwoFactorDialog(
+          serverUrl: serverUrl,
+          username: username,
+        );
+        return;
+      }
+
       messenger.showSnackBar(SnackBar(content: Text(error)));
       return;
     }

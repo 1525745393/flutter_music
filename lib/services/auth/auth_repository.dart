@@ -59,15 +59,38 @@ class AuthRepository {
     // 如果输入是 QuickConnect ID，解析为候选地址列表
     final candidateUrls = await _resolveServerUrlsIfNeeded(serverUrl);
 
-    // 遍历候选地址，逐一尝试登录
-    final List<String> errorMessages = [];
+    // 在多个候选地址上尝试登录
+    await _tryLoginOnServers(
+      candidateUrls: candidateUrls,
+      username: username,
+      password: password,
+      deviceId: savedDeviceId,
+    );
+  }
+
+  /// 在多个候选服务器地址上尝试登录
+  ///
+  /// 遍历候选地址列表，逐个尝试登录，第一个成功的地址即为最终地址。
+  /// 遇到 2FA 异常会直接向上抛出。
+  /// 所有地址都失败时抛出统一的错误信息。
+  Future<void> _tryLoginOnServers({
+    required List<String> candidateUrls,
+    required String username,
+    required String password,
+    String? deviceId,
+  }) async {
+    // 业务错误（账号密码错误、权限不足等）- 优先展示
+    final List<String> businessErrors = [];
+    // 网络错误（连接超时、无法连接等）- 次之
+    final List<String> networkErrors = [];
+
     for (final url in candidateUrls) {
       try {
         final data = await _loginByApi(
           serverUrl: url,
           username: username,
           password: password,
-          deviceId: savedDeviceId,
+          deviceId: deviceId,
         );
 
         final success = data['success'] == true;
@@ -86,57 +109,89 @@ class AuthRepository {
             }
             throw const TwoFactorAuthException('需要两步验证');
           }
-          // 非成功但非2FA：记录错误，尝试下一个地址
-          errorMessages.add('${_mapLoginError(errorCode)} ($url)');
+          // 非成功但非2FA：记录业务错误，尝试下一个地址
+          businessErrors.add('${_mapLoginError(errorCode)} ($url)');
           continue;
         }
 
         final sid = (data['data'] as Map<String, dynamic>?)?['sid'] as String?;
         if (sid == null || sid.isEmpty) {
-          errorMessages.add('未获取到会话信息 ($url)');
+          businessErrors.add('未获取到会话信息 ($url)');
           continue;
         }
 
-        // 保存 device_id（did），下次登录时带上
-        final did =
-            (data['data'] as Map<String, dynamic>?)?['did'] as String?;
-        if (did != null && did.isNotEmpty) {
-          await prefs.setString(_keyDeviceId, did);
-        }
-
-        // 保存 SynoToken（CSRF 防护令牌）
-        final synoTokenValue =
-            (data['data'] as Map<String, dynamic>?)?['synotoken'] as String?;
-        if (synoTokenValue != null && synoTokenValue.isNotEmpty) {
-          _synoToken = synoTokenValue;
-          await prefs.setString(_keySynoToken, synoTokenValue);
-        }
-
-        // 登录成功：加载 API Info 并缓存
-        await _loadApiInfo(url, sid);
-
-        // 保存最终成功的 baseUrl，后续所有请求都用这个地址
-        await prefs.setString(_keyServerUrl, url);
-        await prefs.setString(_keyUsername, username);
-        await prefs.setString(_keySessionId, sid);
+        // 登录成功：保存所有登录结果
+        await _saveLoginResult(
+          body: data,
+          serverUrl: url,
+          username: username,
+        );
         return;
       } on TwoFactorAuthException {
         // 2FA 异常直接向上抛出
         rethrow;
       } on AuthException catch (e) {
-        errorMessages.add('${e.message} ($url)');
+        // AuthException 属于业务相关错误
+        businessErrors.add('${e.message} ($url)');
         continue;
       } catch (e) {
-        // 网络错误等，尝试下一个地址
-        errorMessages.add('$e ($url)');
+        // 网络错误等，归类为网络错误
+        networkErrors.add('$e ($url)');
         continue;
       }
     }
 
-    // 所有候选地址都失败
+    // 所有候选地址都失败，按优先级生成错误信息
     throw AuthException(
-      '所有服务器地址均无法连接。错误详情：${errorMessages.join('；')}',
+      _buildMultiServerError(
+        businessErrors: businessErrors,
+        networkErrors: networkErrors,
+        totalCount: candidateUrls.length,
+        action: '登录',
+      ),
     );
+  }
+
+  /// 保存登录成功后的所有数据
+  ///
+  /// 统一处理登录成功后的保存逻辑，包括：
+  /// - 保存 device_id（did）
+  /// - 保存 SynoToken（CSRF 防护令牌）
+  /// - 加载并缓存 API Info
+  /// - 保存 serverUrl、username、sessionId
+  Future<void> _saveLoginResult({
+    required Map<String, dynamic> body,
+    required String serverUrl,
+    required String username,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final data = body['data'] as Map<String, dynamic>?;
+    final sid = data?['sid'] as String?;
+
+    if (sid == null || sid.isEmpty) {
+      return;
+    }
+
+    // 保存 device_id（did），下次登录时带上
+    final did = data?['did'] as String?;
+    if (did != null && did.isNotEmpty) {
+      await prefs.setString(_keyDeviceId, did);
+    }
+
+    // 保存 SynoToken（CSRF 防护令牌）
+    final synoTokenValue = data?['synotoken'] as String?;
+    if (synoTokenValue != null && synoTokenValue.isNotEmpty) {
+      _synoToken = synoTokenValue;
+      await prefs.setString(_keySynoToken, synoTokenValue);
+    }
+
+    // 登录成功：加载 API Info 并缓存
+    await _loadApiInfo(serverUrl, sid);
+
+    // 保存最终成功的 baseUrl，后续所有请求都用这个地址
+    await prefs.setString(_keyServerUrl, serverUrl);
+    await prefs.setString(_keyUsername, username);
+    await prefs.setString(_keySessionId, sid);
   }
 
   /// 登录成功后加载 API 元信息（版本自适应）
@@ -226,54 +281,115 @@ class AuthRepository {
       throw const AuthException('两步验证失败：未获取到验证令牌，请重新登录');
     }
 
-    final api = SynologyAuthApi(serverUrl: serverUrl);
-    try {
-      final data = await api.loginWithOtp(
-        username: username,
-        password: token,
-        otpCode: otpCode,
-        deviceId: savedDeviceId,
-      );
+    // 如果输入是 QuickConnect ID，解析为候选地址列表
+    final candidateUrls = await _resolveServerUrlsIfNeeded(serverUrl);
 
-      final success = data['success'] == true;
-      if (!success) {
-        final errorCode =
-            (data['error'] as Map<String, dynamic>?)?['code'] as int?;
-        throw AuthException(_mapLoginError(errorCode));
+    // 在多个候选地址上尝试 2FA 验证
+    await _tryTwoFactorOnServers(
+      candidateUrls: candidateUrls,
+      username: username,
+      password: token,
+      otpCode: otpCode,
+      deviceId: savedDeviceId,
+    );
+
+    // 清除临时 token
+    _twoFactorToken = null;
+  }
+
+  /// 在多个候选服务器地址上尝试 2FA 验证
+  ///
+  /// 遍历候选地址列表，逐个尝试提交验证码，第一个成功的地址即为最终地址。
+  /// 所有地址都失败时抛出统一的错误信息。
+  Future<void> _tryTwoFactorOnServers({
+    required List<String> candidateUrls,
+    required String username,
+    required String password,
+    required String otpCode,
+    String? deviceId,
+  }) async {
+    // 业务错误（验证码错误、权限不足等）- 优先展示
+    final List<String> businessErrors = [];
+    // 网络错误（连接超时、无法连接等）- 次之
+    final List<String> networkErrors = [];
+
+    for (final url in candidateUrls) {
+      try {
+        final api = SynologyAuthApi(serverUrl: url);
+        final data = await api.loginWithOtp(
+          username: username,
+          password: password,
+          otpCode: otpCode,
+          deviceId: deviceId,
+        );
+
+        final success = data['success'] == true;
+        if (!success) {
+          final errorCode =
+              (data['error'] as Map<String, dynamic>?)?['code'] as int?;
+          businessErrors.add('${_mapLoginError(errorCode)} ($url)');
+          continue;
+        }
+
+        final sid = (data['data'] as Map<String, dynamic>?)?['sid'] as String?;
+        if (sid == null || sid.isEmpty) {
+          businessErrors.add('未获取到会话信息 ($url)');
+          continue;
+        }
+
+        // 验证成功：保存所有登录结果
+        await _saveLoginResult(
+          body: data,
+          serverUrl: url,
+          username: username,
+        );
+        return;
+      } on SynologyApiException catch (e) {
+        // API 异常属于业务相关错误
+        businessErrors.add('两步验证失败：${e.message} ($url)');
+        continue;
+      } on AuthException catch (e) {
+        businessErrors.add('${e.message} ($url)');
+        continue;
+      } catch (e) {
+        // 网络错误等，归类为网络错误
+        networkErrors.add('$e ($url)');
+        continue;
       }
-
-      final sid = (data['data'] as Map<String, dynamic>?)?['sid'] as String?;
-      if (sid == null || sid.isEmpty) {
-        throw const AuthException('登录失败：未获取到会话信息');
-      }
-
-      // 保存 device_id（did）
-      final did =
-          (data['data'] as Map<String, dynamic>?)?['did'] as String?;
-      if (did != null && did.isNotEmpty) {
-        await prefs.setString(_keyDeviceId, did);
-      }
-
-      // 保存 SynoToken（CSRF 防护令牌）
-      final synoTokenValue =
-          (data['data'] as Map<String, dynamic>?)?['synotoken'] as String?;
-      if (synoTokenValue != null && synoTokenValue.isNotEmpty) {
-        _synoToken = synoTokenValue;
-        await prefs.setString(_keySynoToken, synoTokenValue);
-      }
-
-      // 登录成功：加载 API Info 并缓存
-      await _loadApiInfo(serverUrl, sid);
-
-      await prefs.setString(_keyServerUrl, serverUrl);
-      await prefs.setString(_keyUsername, username);
-      await prefs.setString(_keySessionId, sid);
-
-      // 清除临时 token
-      _twoFactorToken = null;
-    } on SynologyApiException catch (e) {
-      throw AuthException('两步验证失败：${e.message}');
     }
+
+    // 所有候选地址都失败，按优先级生成错误信息
+    throw AuthException(
+      _buildMultiServerError(
+        businessErrors: businessErrors,
+        networkErrors: networkErrors,
+        totalCount: candidateUrls.length,
+        action: '两步验证',
+      ),
+    );
+  }
+
+  /// 构建多地址尝试失败的错误信息
+  ///
+  /// 错误展示优先级：
+  /// 1. 优先展示业务错误（账号密码错误、验证码错误等）
+  /// 2. 只有网络错误时展示第一条网络错误
+  /// 格式："{action}失败：{错误信息}（共尝试 X 个地址）"
+  String _buildMultiServerError({
+    required List<String> businessErrors,
+    required List<String> networkErrors,
+    required int totalCount,
+    required String action,
+  }) {
+    if (businessErrors.isNotEmpty) {
+      // 有业务错误时，优先展示第一条业务错误
+      return '$action失败：${businessErrors.first}（共尝试 $totalCount 个地址）';
+    }
+    if (networkErrors.isNotEmpty) {
+      // 只有网络错误时，展示第一条网络错误
+      return '$action失败：${networkErrors.first}（共尝试 $totalCount 个地址）';
+    }
+    return '$action失败：未知错误（共尝试 $totalCount 个地址）';
   }
 
   Future<LoginDraft?> loadLastLoginDraft() async {

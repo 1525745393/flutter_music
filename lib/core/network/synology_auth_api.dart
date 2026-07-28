@@ -18,6 +18,11 @@ class SynologyAuthApi extends SynologyBaseApi {
 
   /// DSM 登录，返回原始响应数据（包含 success/data/error）。
   ///
+  /// 依次尝试三种请求格式，任意一种成功（success=true）即返回：
+  /// 1. POST + application/json
+  /// 2. POST + application/x-www-form-urlencoded
+  /// 3. GET + queryParameters
+  ///
   /// 如果 NAS 开启了两步验证，会返回 error.code: 403 或 105，
   /// 调用方需改用 [loginWithOtp] 传入 OTP 验证码。
   ///
@@ -31,12 +36,15 @@ class SynologyAuthApi extends SynologyBaseApi {
     String? deviceId,
     String? otpCode,
   }) async {
-    final params = <String, dynamic>{
+    final versionStr = resolveApiVersion(
+      SynologyApiConstants.authApiName,
+      SynologyApiConstants.authVersion,
+    );
+
+    // 构造通用参数（version 为 String 格式，用于 form-urlencoded 和 GET）
+    final paramsStringVersion = <String, dynamic>{
       'api': SynologyApiConstants.authApiName,
-      'version': int.parse(resolveApiVersion(
-        SynologyApiConstants.authApiName,
-        SynologyApiConstants.authVersion,
-      )),
+      'version': versionStr,
       'method': 'login',
       'account': username,
       'passwd': password,
@@ -47,55 +55,149 @@ class SynologyAuthApi extends SynologyBaseApi {
       'device_name': deviceName,
     };
     if (deviceId != null && deviceId.isNotEmpty) {
-      params['device_id'] = deviceId;
+      paramsStringVersion['device_id'] = deviceId;
     }
     if (otpCode != null && otpCode.isNotEmpty) {
-      params['otp_code'] = otpCode;
+      paramsStringVersion['otp_code'] = otpCode;
     }
+
+    // POST JSON 格式使用 int 类型的 version
+    final paramsIntVersion = Map<String, dynamic>.from(paramsStringVersion);
+    paramsIntVersion['version'] = int.parse(versionStr);
 
     final requestPath = resolveApiPath(
       SynologyApiConstants.authApiName,
       SynologyApiConstants.authPath,
     );
 
-    Response<dynamic> response;
+    Map<String, dynamic>? lastResult;
+    dynamic lastError;
+
+    // 第一种格式：POST + application/json
     try {
-      response = await dio.post(
+      final response = await _postWithRedirect(
         requestPath,
-        data: jsonEncode(params),
-        options: Options(
-          contentType: 'application/json',
-          followRedirects: false,
-          validateStatus: (status) => status != null,
-        ),
+        data: jsonEncode(paramsIntVersion),
+        contentType: 'application/json',
       );
-    } on DioException catch (e) {
-      if (e.type == DioExceptionType.badResponse && e.response != null) {
-        response = e.response!;
-      } else {
-        rethrow;
+      final body = requireBody(response);
+      if (body['success'] == true) {
+        return body;
       }
+      lastResult = body;
+    } catch (e) {
+      lastError = e;
     }
 
-    // 处理重定向（3xx）：禁用自动重定向后，手动跟随重定向并保持 POST 方法
-    if (response.statusCode != null &&
-        response.statusCode! >= 300 &&
-        response.statusCode! < 400) {
-      final redirectUrl = response.headers.value('location');
-      if (redirectUrl != null && redirectUrl.isNotEmpty) {
+    // 第二种格式：POST + application/x-www-form-urlencoded
+    try {
+      final response = await _postWithRedirect(
+        requestPath,
+        data: paramsStringVersion,
+        contentType: 'application/x-www-form-urlencoded',
+      );
+      final body = requireBody(response);
+      if (body['success'] == true) {
+        return body;
+      }
+      lastResult = body;
+    } catch (e) {
+      lastError ??= e;
+    }
+
+    // 第三种格式：GET + queryParameters
+    try {
+      final response = await dio.get(
+        requestPath,
+        queryParameters: paramsStringVersion,
+      );
+      final body = requireBody(response);
+      if (body['success'] == true) {
+        return body;
+      }
+      lastResult = body;
+    } catch (e) {
+      lastError ??= e;
+    }
+
+    // 所有格式都失败，优先返回最后一个有效 JSON 响应（success=false），否则抛出异常
+    if (lastResult != null) {
+      return lastResult;
+    }
+    if (lastError != null) {
+      throw lastError;
+    }
+    throw StateError('登录请求失败：所有格式均未返回有效结果');
+  }
+
+  /// 手动处理重定向的 POST 请求。
+  ///
+  /// - 禁用 Dio 自动重定向，手动跟随 3xx 重定向
+  /// - 保持 POST 方法和请求体不变
+  /// - 支持相对路径重定向（与 baseUrl 拼接）
+  /// - 最多跟随 5 次重定向
+  /// - 检测循环重定向（同一 URL 出现第二次即停止）
+  Future<Response<dynamic>> _postWithRedirect(
+    String path, {
+    required dynamic data,
+    required String contentType,
+  }) async {
+    const maxRedirects = 5;
+    final visitedUrls = <String>{};
+    String currentUrl = path;
+
+    for (int i = 0; i <= maxRedirects; i++) {
+      // 检测循环重定向：同一 URL 出现第二次则停止
+      if (visitedUrls.contains(currentUrl)) {
+        throw DioException(
+          requestOptions: RequestOptions(path: currentUrl),
+          error: '检测到循环重定向：$currentUrl',
+        );
+      }
+      visitedUrls.add(currentUrl);
+
+      Response<dynamic> response;
+      try {
         response = await dio.post(
-          redirectUrl,
-          data: jsonEncode(params),
+          currentUrl,
+          data: data,
           options: Options(
-            contentType: 'application/json',
+            contentType: contentType,
             followRedirects: false,
             validateStatus: (status) => status != null,
           ),
         );
+      } on DioException catch (e) {
+        if (e.type == DioExceptionType.badResponse && e.response != null) {
+          response = e.response!;
+        } else {
+          rethrow;
+        }
       }
+
+      // 判断是否为重定向响应（3xx）
+      final statusCode = response.statusCode;
+      if (statusCode == null || statusCode < 300 || statusCode >= 400) {
+        return response;
+      }
+
+      // 获取重定向地址
+      final redirectUrl = response.headers.value('location');
+      if (redirectUrl == null || redirectUrl.isEmpty) {
+        return response;
+      }
+
+      // 解析重定向 URL：支持相对路径，与 baseUrl 拼接
+      final baseUri = Uri.parse(serverUrl);
+      final resolvedUri = baseUri.resolve(redirectUrl);
+      currentUrl = resolvedUri.toString();
     }
 
-    return requireBody(response);
+    // 超过最大重定向次数
+    throw DioException(
+      requestOptions: RequestOptions(path: currentUrl),
+      error: '重定向次数超过上限（$maxRedirects 次）',
+    );
   }
 
   /// 带 OTP 验证码的登录（用于 2FA 两步验证）。
