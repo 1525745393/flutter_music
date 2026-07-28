@@ -15,14 +15,8 @@ class AuthException implements Exception {
 }
 
 /// 2FA 需要验证码的异常
-class TwoFactorAuthException implements AuthException {
-  const TwoFactorAuthException(this.message);
-
-  @override
-  final String message;
-
-  @override
-  String toString() => message;
+class TwoFactorAuthException extends AuthException {
+  const TwoFactorAuthException(super.message);
 }
 
 class AuthRepository {
@@ -247,7 +241,6 @@ class AuthRepository {
     required String username,
     required String password,
     String? deviceId,
-    String? otpCode,
   }) async {
     final api = SynologyAuthApi(serverUrl: serverUrl);
     try {
@@ -255,7 +248,6 @@ class AuthRepository {
         username: username,
         password: password,
         deviceId: deviceId,
-        otpCode: otpCode,
       );
     } on SynologyApiException catch (e) {
       throw AuthException('登录失败：${e.message}');

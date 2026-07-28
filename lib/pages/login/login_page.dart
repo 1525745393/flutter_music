@@ -94,7 +94,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       barrierDismissible: false,
       builder: (dialogContext) {
         return StatefulBuilder(
-          builder: (context, setState) {
+          builder: (ctx, setState) {
             return AlertDialog(
               title: const Text('两步验证'),
               content: Column(

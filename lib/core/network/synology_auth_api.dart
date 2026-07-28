@@ -5,6 +5,9 @@ import 'package:dio/dio.dart';
 import 'synology_api_constants.dart';
 import 'synology_base_api.dart';
 
+/// 登录请求格式枚举
+enum _Format { postJson, postForm, getQuery }
+
 /// 群晖认证 API 模块。
 ///
 /// 只放登录/登出/会话校验等认证相关接口。
@@ -70,64 +73,65 @@ class SynologyAuthApi extends SynologyBaseApi {
       SynologyApiConstants.authPath,
     );
 
+    // 依次尝试三种请求格式，任意一种成功即返回。
+    // 如果返回了有效 JSON（success=false），说明格式兼容但业务失败（如密码错误、需要2FA），
+    // 此时直接返回业务错误，不再 fallback，避免重复请求触发 IP 封禁。
+    final formats = <(_Format, dynamic, String?)>[
+      (_Format.postJson, jsonEncode(paramsIntVersion), 'application/json'),
+      (_Format.postForm, paramsStringVersion, 'application/x-www-form-urlencoded'),
+      (_Format.getQuery, paramsStringVersion, null),
+    ];
+
     Map<String, dynamic>? lastResult;
     dynamic lastError;
 
-    // 第一种格式：POST + application/json
-    try {
-      final response = await _postWithRedirect(
-        requestPath,
-        data: jsonEncode(paramsIntVersion),
-        contentType: 'application/json',
-      );
-      final body = requireBody(response);
-      if (body['success'] == true) {
+    for (final (format, data, contentType) in formats) {
+      try {
+        final response = await _sendRequest(
+          format: format,
+          path: requestPath,
+          data: data,
+          contentType: contentType,
+        );
+        final body = requireBody(response);
+        if (body['success'] == true) {
+          return body;
+        }
+        // 有效 JSON 且 success=false：格式兼容，业务失败，直接返回
         return body;
+      } catch (e) {
+        // 仅网络错误或响应无法解析时，记录错误并尝试下一种格式
+        lastError = e;
       }
-      lastResult = body;
-    } catch (e) {
-      lastError = e;
     }
 
-    // 第二种格式：POST + application/x-www-form-urlencoded
-    try {
-      final response = await _postWithRedirect(
-        requestPath,
-        data: paramsStringVersion,
-        contentType: 'application/x-www-form-urlencoded',
-      );
-      final body = requireBody(response);
-      if (body['success'] == true) {
-        return body;
-      }
-      lastResult = body;
-    } catch (e) {
-      lastError ??= e;
-    }
-
-    // 第三种格式：GET + queryParameters
-    try {
-      final response = await dio.get(
-        requestPath,
-        queryParameters: paramsStringVersion,
-      );
-      final body = requireBody(response);
-      if (body['success'] == true) {
-        return body;
-      }
-      lastResult = body;
-    } catch (e) {
-      lastError ??= e;
-    }
-
-    // 所有格式都失败，优先返回最后一个有效 JSON 响应（success=false），否则抛出异常
-    if (lastResult != null) {
-      return lastResult;
-    }
+    // 所有格式均出现网络错误
     if (lastError != null) {
       throw lastError;
     }
     throw StateError('登录请求失败：所有格式均未返回有效结果');
+  }
+
+  /// 按指定格式发送登录请求
+  ///
+  /// POST 格式通过 [_postWithRedirect] 处理重定向，GET 格式使用 Dio 默认行为。
+  Future<Response<dynamic>> _sendRequest({
+    required _Format format,
+    required String path,
+    required dynamic data,
+    required String? contentType,
+  }) async {
+    switch (format) {
+      case _Format.postJson:
+      case _Format.postForm:
+        return _postWithRedirect(
+          path,
+          data: data,
+          contentType: contentType!,
+        );
+      case _Format.getQuery:
+        return dio.get(path, queryParameters: data as Map<String, dynamic>);
+    }
   }
 
   /// 手动处理重定向的 POST 请求。
