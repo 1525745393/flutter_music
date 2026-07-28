@@ -15,29 +15,40 @@ class LyricLine {
 /// 歌词解析器
 class LyricsParser {
   /// 解析LRC格式歌词
+  ///
+  /// 支持一行多个时间戳的格式，例如：
+  ///   [00:01.00][00:05.00]歌词文本
+  /// 会为每个时间戳生成一条 LyricLine。
   static List<LyricLine> parseLrc(String lrcText) {
     final lines = <LyricLine>[];
     final linesList = lrcText.split('\n');
+    // 匹配所有 [mm:ss.xx] 或 [mm:ss.xxx] 格式的时间戳
+    final timeRegExp = RegExp(r'\[(\d{2}):(\d{2})\.(\d{2,3})\]');
 
     for (final line in linesList) {
       final trimmedLine = line.trim();
       if (trimmedLine.isEmpty) continue;
 
-      // LRC格式: [mm:ss.xx]歌词文本
-      final match = RegExp(r'^\[(\d{2}):(\d{2})\.(\d{2,3})\](.*)$').firstMatch(trimmedLine);
-      if (match != null) {
+      // 提取所有时间戳
+      final timeMatches = timeRegExp.allMatches(trimmedLine);
+      if (timeMatches.isEmpty) continue;
+
+      // 提取歌词文本（移除所有时间戳后的内容）
+      final text = trimmedLine.replaceAll(timeRegExp, '').trim();
+      if (text.isEmpty) continue;
+
+      // 为每个时间戳生成一条歌词行
+      for (final match in timeMatches) {
         final minutes = int.parse(match.group(1)!);
         final seconds = int.parse(match.group(2)!);
         final milliseconds = int.parse(match.group(3)!);
         final time = minutes * 60000 + seconds * 1000 + milliseconds;
-        final text = match.group(4)!.trim();
-
-        if (text.isNotEmpty) {
-          lines.add(LyricLine(time: time, text: text));
-        }
+        lines.add(LyricLine(time: time, text: text));
       }
     }
 
+    // 按时间排序，确保多个时间戳生成的行顺序正确
+    lines.sort((a, b) => a.time.compareTo(b.time));
     return lines;
   }
 

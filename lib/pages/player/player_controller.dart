@@ -13,6 +13,9 @@ enum PlayerState {
 }
 
 /// 播放控制器
+///
+/// 作为播放器状态的唯一数据源，统一维护播放队列、当前索引和当前歌曲。
+/// [AudioPlayerService] 仅负责音频播放控制，所有队列状态由本类管理。
 class PlayerController extends Notifier<PlayerState> {
   @override
   PlayerState build() {
@@ -22,10 +25,10 @@ class PlayerController extends Notifier<PlayerState> {
         _updatePlayerState(next.value!);
       }
     });
-    
+
     // 初始化音频服务
     _initializeAudioService();
-    
+
     return PlayerState.idle;
   }
 
@@ -37,15 +40,25 @@ class PlayerController extends Notifier<PlayerState> {
     if (session != null) {
       service.setServerUrl(session.serverUrl);
     }
+    // 设置播放完成回调，触发下一首
+    service.onPlaybackCompleted = _onPlaybackCompleted;
     await service.initialize();
+  }
+
+  /// 播放完成回调
+  ///
+  /// 当 [AudioPlayerService] 检测到一首歌曲播放完成时触发，
+  /// 由本方法决定是否切换到下一首。
+  void _onPlaybackCompleted() {
+    next();
   }
 
   /// 当前播放的歌曲
   SongItem? _currentSong;
-  
+
   /// 播放队列
   List<SongItem> _playQueue = [];
-  
+
   /// 当前播放索引
   int _currentIndex = -1;
 
@@ -62,19 +75,18 @@ class PlayerController extends Notifier<PlayerState> {
   Future<void> setPlayQueue(List<SongItem> queue, {int startIndex = 0}) async {
     _playQueue = queue;
     _currentIndex = startIndex;
-    
+
     if (_playQueue.isNotEmpty && startIndex < _playQueue.length) {
       _currentSong = _playQueue[startIndex];
       state = PlayerState.loading;
-      
-      // 设置音频播放服务队列
+
       final service = ref.read(audioPlayerServiceProvider);
       final authRepository = ref.read(authRepositoryProvider);
       final session = await authRepository.loadSession();
       if (session != null) {
         service.setServerUrl(session.serverUrl);
       }
-      await service.setPlayQueue(queue, startIndex: startIndex);
+      await service.loadSong(_playQueue[startIndex].id);
     }
   }
 
@@ -113,12 +125,44 @@ class PlayerController extends Notifier<PlayerState> {
 
   /// 下一首
   Future<void> next() async {
-    await ref.read(audioPlayerServiceProvider).next();
+    if (_currentIndex < _playQueue.length - 1) {
+      final oldIndex = _currentIndex;
+      final oldSong = _currentSong;
+      _currentIndex++;
+      _currentSong = _playQueue[_currentIndex];
+      state = PlayerState.loading;
+      try {
+        await ref.read(audioPlayerServiceProvider).loadSong(_currentSong!.id);
+        await ref.read(audioPlayerServiceProvider).play();
+        state = PlayerState.playing;
+      } catch (e) {
+        // 加载失败时回滚到原来的歌曲
+        _currentIndex = oldIndex;
+        _currentSong = oldSong;
+        state = PlayerState.error;
+      }
+    }
   }
 
   /// 上一首
   Future<void> previous() async {
-    await ref.read(audioPlayerServiceProvider).previous();
+    if (_currentIndex > 0) {
+      final oldIndex = _currentIndex;
+      final oldSong = _currentSong;
+      _currentIndex--;
+      _currentSong = _playQueue[_currentIndex];
+      state = PlayerState.loading;
+      try {
+        await ref.read(audioPlayerServiceProvider).loadSong(_currentSong!.id);
+        await ref.read(audioPlayerServiceProvider).play();
+        state = PlayerState.playing;
+      } catch (e) {
+        // 加载失败时回滚到原来的歌曲
+        _currentIndex = oldIndex;
+        _currentSong = oldSong;
+        state = PlayerState.error;
+      }
+    }
   }
 
   /// 跳转到指定位置
@@ -167,19 +211,21 @@ final playerControllerProvider = NotifierProvider<PlayerController, PlayerState>
 
 /// 当前播放歌曲的 Provider
 final currentSongProvider = Provider<SongItem?>((ref) {
-  return ref.watch(currentSongProviderFromService);
+  // 依赖 Controller 状态变化触发重新评估
+  ref.watch(playerControllerProvider);
+  return ref.read(playerControllerProvider.notifier).currentSong;
 });
 
 /// 播放队列的 Provider
 final playQueueProvider = Provider<List<SongItem>>((ref) {
-  final service = ref.read(audioPlayerServiceProvider);
-  return service.playQueue;
+  ref.watch(playerControllerProvider);
+  return ref.read(playerControllerProvider.notifier).playQueue;
 });
 
 /// 当前播放索引的 Provider
 final currentIndexProvider = Provider<int>((ref) {
-  final service = ref.read(audioPlayerServiceProvider);
-  return service.currentIndex;
+  ref.watch(playerControllerProvider);
+  return ref.read(playerControllerProvider.notifier).currentIndex;
 });
 
 /// 播放位置流 Provider

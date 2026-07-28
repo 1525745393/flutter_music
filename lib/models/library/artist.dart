@@ -60,6 +60,8 @@ class Artist {
 
     return Artist(
       name: name,
+      albumCount: (map['album_count'] as num?)?.toInt() ?? 0,
+      songCount: (map['song_count'] as num?)?.toInt() ?? 0,
       avgRating: avgRating,
     );
   }

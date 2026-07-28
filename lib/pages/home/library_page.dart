@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -77,21 +78,27 @@ class LibraryPage extends ConsumerWidget {
                   leading: song.coverUrl != null
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(8),
-                          child: Image.network(
-                            song.coverUrl!,
+                          child: CachedNetworkImage(
+                            imageUrl: song.coverUrl!,
                             width: 48,
                             height: 48,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                width: 48,
-                                height: 48,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.surfaceContainerHighest,
-                                child: const Icon(Icons.music_note),
-                              );
-                            },
+                            placeholder: (context, url) => Container(
+                              width: 48,
+                              height: 48,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.surfaceContainerHighest,
+                              child: const Icon(Icons.music_note),
+                            ),
+                            errorWidget: (context, url, error) => Container(
+                              width: 48,
+                              height: 48,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.surfaceContainerHighest,
+                              child: const Icon(Icons.music_note),
+                            ),
                           ),
                         )
                       : Container(

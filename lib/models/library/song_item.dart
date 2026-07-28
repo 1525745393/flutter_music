@@ -5,6 +5,9 @@ class SongItem {
     required this.artist,
     required this.album,
     this.coverUrl,
+    this.duration = 0,
+    this.rating = 0,
+    this.trackNumber,
   });
 
   final String id;
@@ -13,6 +16,15 @@ class SongItem {
   final String album;
   final String? coverUrl;
 
+  /// 歌曲时长（秒）
+  final int duration;
+
+  /// 用户评分（0-5）
+  final int rating;
+
+  /// 曲目号
+  final int? trackNumber;
+
   /// 复制并更新部分字段
   SongItem copyWith({
     String? id,
@@ -20,6 +32,9 @@ class SongItem {
     String? artist,
     String? album,
     String? coverUrl,
+    int? duration,
+    int? rating,
+    int? trackNumber,
   }) {
     return SongItem(
       id: id ?? this.id,
@@ -27,28 +42,48 @@ class SongItem {
       artist: artist ?? this.artist,
       album: album ?? this.album,
       coverUrl: coverUrl ?? this.coverUrl,
+      duration: duration ?? this.duration,
+      rating: rating ?? this.rating,
+      trackNumber: trackNumber ?? this.trackNumber,
     );
   }
 
   factory SongItem.fromMap(Map<String, dynamic> map) {
+    final additional = map['additional'];
     return SongItem(
       id: '${map['id'] ?? ''}',
       title: (map['title'] as String?)?.trim().isNotEmpty == true
           ? map['title'] as String
           : '未知歌曲',
       artist: _readName(
-        map['additional'],
+        additional,
         'song_tag',
         'artist',
         fallback: '未知歌手',
       ),
       album: _readName(
-        map['additional'],
+        additional,
         'song_tag',
         'album',
         fallback: '未知专辑',
       ),
-      coverUrl: _readCoverUrl(map['additional']),
+      coverUrl: _readCoverUrl(additional),
+      // 歌曲时长（秒），来自 song_audio.duration
+      duration: _readInt(
+        additional,
+        'song_audio',
+        'duration',
+        fallback: 0,
+      ),
+      // 用户评分（0-5），song_rating 为对象格式 {rating: value}
+      rating: _readInt(
+        additional,
+        'song_rating',
+        'rating',
+        fallback: 0,
+      ),
+      // 曲目号，来自 song_tag.track
+      trackNumber: _readIntOrNull(additional, 'song_tag', 'track'),
     );
   }
 
@@ -67,6 +102,34 @@ class SongItem {
       return fallback;
     }
     return name;
+  }
+
+  /// 读取嵌套结构中的 int 字段，缺失或类型不符时返回 fallback
+  /// 兼容 int 与 num（如 duration 可能是 double）
+  static int _readInt(
+    dynamic root,
+    String first,
+    String second, {
+    required int fallback,
+  }) {
+    final firstMap = root is Map<String, dynamic> ? root[first] : null;
+    final value = firstMap is Map<String, dynamic> ? firstMap[second] : null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return fallback;
+  }
+
+  /// 读取嵌套结构中的可空 int 字段，缺失时返回 null
+  static int? _readIntOrNull(
+    dynamic root,
+    String first,
+    String second,
+  ) {
+    final firstMap = root is Map<String, dynamic> ? root[first] : null;
+    final value = firstMap is Map<String, dynamic> ? firstMap[second] : null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return null;
   }
 
   /// 读取封面图URL

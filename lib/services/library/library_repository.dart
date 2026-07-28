@@ -28,7 +28,24 @@ class LibraryRepository {
 
   final AuthRepository _authRepository;
 
-  Future<List<SongItem>> fetchSongs({int limit = 100}) async {
+  /// 统一处理音乐库 API 调用的样板逻辑：
+  /// 会话校验、API 实例创建、success 校验、会话失效检测、网络与 API 异常处理。
+  ///
+  /// [apiCall] 接收已创建好的 API 实例与 sessionId，返回原始响应体；
+  /// [onSuccess] 在响应成功时被调用，可使用 [api] 构造封面 URL 等附加资源；
+  /// [errorPrefix] 用于错误消息前缀（如 "音乐库请求失败"）。
+  Future<T> _execute<T>({
+    required Future<Map<String, dynamic>> Function(
+      SynologyAudioStationApi api,
+      String sid,
+    ) apiCall,
+    required T Function(
+      Map<String, dynamic> body,
+      SynologyAudioStationApi api,
+      String sid,
+    ) onSuccess,
+    String? errorPrefix,
+  }) async {
     final session = await _authRepository.loadSession();
     if (session == null) {
       throw const SessionExpiredException('会话不存在，请先登录');
@@ -39,8 +56,9 @@ class LibraryRepository {
       apiInfo: _authRepository.apiInfo,
       synoToken: _authRepository.synoToken,
     );
+    final sid = session.sessionId;
     try {
-      final body = await api.listSongs(sid: session.sessionId, limit: limit);
+      final body = await apiCall(api, sid);
 
       if (body['success'] != true) {
         final code = (body['error'] as Map<String, dynamic>?)?['code'] as int?;
@@ -50,25 +68,11 @@ class LibraryRepository {
           throw const SessionExpiredException('会话已失效，请重新登录');
         }
         throw LibraryException(
-          '音乐库请求失败：${_mapLibraryError(code)}',
+          '${errorPrefix ?? '请求失败'}：${_mapLibraryError(code)}',
         );
       }
 
-      final songs =
-          (body['data'] as Map<String, dynamic>?)?['songs'] as List<dynamic>? ??
-          [];
-      return songs
-          .whereType<Map<String, dynamic>>()
-          .map((map) {
-            final song = SongItem.fromMap(map);
-            // 构造封面图URL
-            final coverUrl = api.buildSongCoverUrl(
-              sid: session.sessionId,
-              songId: song.id,
-            );
-            return song.copyWith(coverUrl: coverUrl);
-          })
-          .toList(growable: false);
+      return onSuccess(body, api, sid);
     } on DioException catch (e) {
       throw LibraryException('网络异常：${e.message}');
     } on SynologyApiException catch (e) {
@@ -79,62 +83,57 @@ class LibraryRepository {
           '认证失败（HTTP ${e.statusCode}），请重新登录',
         );
       }
-      throw LibraryException('音乐库请求失败：${e.message}');
+      throw LibraryException('${errorPrefix ?? '请求失败'}：${e.message}');
     }
+  }
+
+  Future<List<SongItem>> fetchSongs({int limit = 100}) async {
+    return _execute(
+      apiCall: (api, sid) => api.listSongs(sid: sid, limit: limit),
+      onSuccess: (body, api, sid) {
+        final songs =
+            (body['data'] as Map<String, dynamic>?)?['songs'] as List<dynamic>? ??
+                [];
+        return songs
+            .whereType<Map<String, dynamic>>()
+            .map((map) {
+              final song = SongItem.fromMap(map);
+              // 构造封面图URL
+              final coverUrl = api.buildSongCoverUrl(
+                sid: sid,
+                songId: song.id,
+              );
+              return song.copyWith(coverUrl: coverUrl);
+            })
+            .toList(growable: false);
+      },
+      errorPrefix: '音乐库请求失败',
+    );
   }
 
   /// 获取歌手列表
   Future<List<Artist>> fetchArtists({int limit = 100}) async {
-    final session = await _authRepository.loadSession();
-    if (session == null) {
-      throw const SessionExpiredException('会话不存在，请先登录');
-    }
-
-    final api = SynologyAudioStationApi(
-      serverUrl: session.serverUrl,
-      apiInfo: _authRepository.apiInfo,
-      synoToken: _authRepository.synoToken,
+    return _execute(
+      apiCall: (api, sid) => api.listArtists(sid: sid, limit: limit),
+      onSuccess: (body, api, sid) {
+        final artists =
+            (body['data'] as Map<String, dynamic>?)?['artists'] as List<dynamic>? ??
+                [];
+        return artists
+            .whereType<Map<String, dynamic>>()
+            .map((map) {
+              final artist = Artist.fromMap(map);
+              // 构造歌手封面URL
+              final coverUrl = api.buildArtistCoverUrl(
+                sid: sid,
+                artistName: artist.name,
+              );
+              return artist.copyWith(coverUrl: coverUrl);
+            })
+            .toList(growable: false);
+      },
+      errorPrefix: '歌手列表请求失败',
     );
-    try {
-      final body = await api.listArtists(sid: session.sessionId, limit: limit);
-
-      if (body['success'] != true) {
-        final code = (body['error'] as Map<String, dynamic>?)?['code'] as int?;
-        if (_isSessionExpired(code)) {
-          await _authRepository.clearSession();
-          throw const SessionExpiredException('会话已失效，请重新登录');
-        }
-        throw LibraryException(
-          '歌手列表请求失败：${_mapLibraryError(code)}',
-        );
-      }
-
-      final artists =
-          (body['data'] as Map<String, dynamic>?)?['artists'] as List<dynamic>? ??
-              [];
-      return artists
-          .whereType<Map<String, dynamic>>()
-          .map((map) {
-            final artist = Artist.fromMap(map);
-            // 构造歌手封面URL
-            final coverUrl = api.buildArtistCoverUrl(
-              sid: session.sessionId,
-              artistName: artist.name,
-            );
-            return artist.copyWith(coverUrl: coverUrl);
-          })
-          .toList(growable: false);
-    } on DioException catch (e) {
-      throw LibraryException('网络异常：${e.message}');
-    } on SynologyApiException catch (e) {
-      if (e.statusCode == 401 || e.statusCode == 403) {
-        await _authRepository.clearSession();
-        throw SessionExpiredException(
-          '认证失败（HTTP ${e.statusCode}），请重新登录',
-        );
-      }
-      throw LibraryException('歌手列表请求失败：${e.message}');
-    }
   }
 
   /// 获取专辑列表
@@ -142,62 +141,33 @@ class LibraryRepository {
     int limit = 100,
     String? artistName,
   }) async {
-    final session = await _authRepository.loadSession();
-    if (session == null) {
-      throw const SessionExpiredException('会话不存在，请先登录');
-    }
-
-    final api = SynologyAudioStationApi(
-      serverUrl: session.serverUrl,
-      apiInfo: _authRepository.apiInfo,
-      synoToken: _authRepository.synoToken,
-    );
-    try {
-      final body = await api.listAlbums(
-        sid: session.sessionId,
+    return _execute(
+      apiCall: (api, sid) => api.listAlbums(
+        sid: sid,
         limit: limit,
         artist: artistName,
         additional: 'avg_rating',
-      );
-
-      if (body['success'] != true) {
-        final code = (body['error'] as Map<String, dynamic>?)?['code'] as int?;
-        if (_isSessionExpired(code)) {
-          await _authRepository.clearSession();
-          throw const SessionExpiredException('会话已失效，请重新登录');
-        }
-        throw LibraryException(
-          '专辑列表请求失败：${_mapLibraryError(code)}',
-        );
-      }
-
-      final albums =
-          (body['data'] as Map<String, dynamic>?)?['albums'] as List<dynamic>? ??
-              [];
-      return albums
-          .whereType<Map<String, dynamic>>()
-          .map((map) {
-            final album = Album.fromMap(map);
-            // 构造专辑封面URL
-            final coverUrl = api.buildAlbumCoverUrl(
-              sid: session.sessionId,
-              albumName: album.title,
-              albumArtistName: album.artist,
-            );
-            return album.copyWith(coverUrl: coverUrl);
-          })
-          .toList(growable: false);
-    } on DioException catch (e) {
-      throw LibraryException('网络异常：${e.message}');
-    } on SynologyApiException catch (e) {
-      if (e.statusCode == 401 || e.statusCode == 403) {
-        await _authRepository.clearSession();
-        throw SessionExpiredException(
-          '认证失败（HTTP ${e.statusCode}），请重新登录',
-        );
-      }
-      throw LibraryException('专辑列表请求失败：${e.message}');
-    }
+      ),
+      onSuccess: (body, api, sid) {
+        final albums =
+            (body['data'] as Map<String, dynamic>?)?['albums'] as List<dynamic>? ??
+                [];
+        return albums
+            .whereType<Map<String, dynamic>>()
+            .map((map) {
+              final album = Album.fromMap(map);
+              // 构造专辑封面URL
+              final coverUrl = api.buildAlbumCoverUrl(
+                sid: sid,
+                albumName: album.title,
+                albumArtistName: album.artist,
+              );
+              return album.copyWith(coverUrl: coverUrl);
+            })
+            .toList(growable: false);
+      },
+      errorPrefix: '专辑列表请求失败',
+    );
   }
 
   /// 获取指定专辑的歌曲列表
@@ -205,111 +175,53 @@ class LibraryRepository {
     required String albumName,
     required String albumArtist,
   }) async {
-    final session = await _authRepository.loadSession();
-    if (session == null) {
-      throw const SessionExpiredException('会话不存在，请先登录');
-    }
-
-    final api = SynologyAudioStationApi(
-      serverUrl: session.serverUrl,
-      apiInfo: _authRepository.apiInfo,
-      synoToken: _authRepository.synoToken,
-    );
-    try {
-      final body = await api.listSongs(
-        sid: session.sessionId,
+    return _execute(
+      apiCall: (api, sid) => api.listSongs(
+        sid: sid,
         limit: 500,
         album: albumName,
         albumArtist: albumArtist,
         // 注意：AudioStation 文档中 sort_by 可选值为 title/name/artist/random
         // 专辑内歌曲默认按曲目号排序，此处不指定排序方式以使用 API 默认行为
-      );
-
-      if (body['success'] != true) {
-        final code = (body['error'] as Map<String, dynamic>?)?['code'] as int?;
-        if (_isSessionExpired(code)) {
-          await _authRepository.clearSession();
-          throw const SessionExpiredException('会话已失效，请重新登录');
-        }
-        throw LibraryException(
-          '专辑歌曲请求失败：${_mapLibraryError(code)}',
-        );
-      }
-
-      final songs =
-          (body['data'] as Map<String, dynamic>?)?['songs'] as List<dynamic>? ??
-              [];
-      return songs
-          .whereType<Map<String, dynamic>>()
-          .map((map) {
-            final song = SongItem.fromMap(map);
-            final coverUrl = api.buildSongCoverUrl(
-              sid: session.sessionId,
-              songId: song.id,
-            );
-            return song.copyWith(coverUrl: coverUrl);
-          })
-          .toList(growable: false);
-    } on DioException catch (e) {
-      throw LibraryException('网络异常：${e.message}');
-    } on SynologyApiException catch (e) {
-      if (e.statusCode == 401 || e.statusCode == 403) {
-        await _authRepository.clearSession();
-        throw SessionExpiredException(
-          '认证失败（HTTP ${e.statusCode}），请重新登录',
-        );
-      }
-      throw LibraryException('专辑歌曲请求失败：${e.message}');
-    }
+      ),
+      onSuccess: (body, api, sid) {
+        final songs =
+            (body['data'] as Map<String, dynamic>?)?['songs'] as List<dynamic>? ??
+                [];
+        return songs
+            .whereType<Map<String, dynamic>>()
+            .map((map) {
+              final song = SongItem.fromMap(map);
+              final coverUrl = api.buildSongCoverUrl(
+                sid: sid,
+                songId: song.id,
+              );
+              return song.copyWith(coverUrl: coverUrl);
+            })
+            .toList(growable: false);
+      },
+      errorPrefix: '专辑歌曲请求失败',
+    );
   }
 
   /// 获取歌词
   Future<List<LyricLine>> fetchLyrics(String songId) async {
-    final session = await _authRepository.loadSession();
-    if (session == null) {
-      throw const SessionExpiredException('会话不存在，请先登录');
-    }
+    return _execute(
+      apiCall: (api, sid) => api.getLyrics(sid: sid, songId: songId),
+      onSuccess: (body, api, sid) {
+        // 获取歌词文本
+        final lyricsData = body['data'] as Map<String, dynamic>?;
+        final lyricsText = lyricsData?['lyrics'] as String?;
 
-    final api = SynologyAudioStationApi(
-      serverUrl: session.serverUrl,
-      apiInfo: _authRepository.apiInfo,
-      synoToken: _authRepository.synoToken,
-    );
-    try {
-      final body = await api.getLyrics(sid: session.sessionId, songId: songId);
-
-      if (body['success'] != true) {
-        final code = (body['error'] as Map<String, dynamic>?)?['code'] as int?;
-        if (_isSessionExpired(code)) {
-          await _authRepository.clearSession();
-          throw const SessionExpiredException('会话已失效，请重新登录');
+        if (lyricsText == null || lyricsText.isEmpty) {
+          return [];
         }
-        throw LibraryException(
-          '歌词请求失败：${_mapLibraryError(code)}',
-        );
-      }
 
-      // 获取歌词文本
-      final lyricsData = body['data'] as Map<String, dynamic>?;
-      final lyricsText = lyricsData?['lyrics'] as String?;
-
-      if (lyricsText == null || lyricsText.isEmpty) {
-        return [];
-      }
-
-      // 解析歌词
-      return LyricsParser.parseLrc(lyricsText);
-    } on DioException catch (e) {
-      throw LibraryException('网络异常：${e.message}');
-    } on SynologyApiException catch (e) {
-      if (e.statusCode == 401 || e.statusCode == 403) {
-        await _authRepository.clearSession();
-        throw SessionExpiredException(
-          '认证失败（HTTP ${e.statusCode}），请重新登录',
-        );
-      }
-      throw LibraryException('歌词请求失败：${e.message}');
-    }
+        // 解析歌词
+        return LyricsParser.parseLrc(lyricsText);
+      },
+      errorPrefix: '歌词请求失败',
+    );
   }
 
   /// 判断错误码是否表示会话失效
