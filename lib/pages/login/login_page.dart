@@ -86,15 +86,15 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     final codeController = TextEditingController();
     final focusNode = FocusNode();
 
+    String? errorText;
+    bool isLoading = false;
+
     await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (context, setState) {
-            String? errorText;
-            bool isLoading = false;
-
             return AlertDialog(
               title: const Text('两步验证'),
               content: Column(
