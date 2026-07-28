@@ -1,3 +1,11 @@
+## [1.7.3](https://github.com/1525745393/flutter_music/compare/v1.7.2...v1.7.3) (2026-07-28)
+
+
+### Bug Fixes
+
+* **auth:** 修复登录兼容性问题 + 实现2FA验证码界面 ([041e27e](https://github.com/1525745393/flutter_music/commit/041e27e8cb5fa367bd51afc16a5863ee21f1745e))
+* **login:** 修复 dead_code 警告 - 将状态变量移到 StatefulBuilder 外部 ([cdefaa4](https://github.com/1525745393/flutter_music/commit/cdefaa447a9fadae8f9fe3c5fc1c2257a5d56789))
+
 ## [1.7.2](https://github.com/1525745393/flutter_music/compare/v1.7.1...v1.7.2) (2026-07-08)
 
 
