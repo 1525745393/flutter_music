@@ -1,3 +1,11 @@
+## [1.7.4](https://github.com/1525745393/flutter_music/compare/v1.7.3...v1.7.4) (2026-07-28)
+
+
+### Bug Fixes
+
+* **auth:** 业务错误不再fallback避免IP封禁 + 清理死代码 ([6a331d6](https://github.com/1525745393/flutter_music/commit/6a331d6682264d7ec69cdaa07466528049d4d30f))
+* **auth:** 移除未使用的 lastResult 变量 ([add3d68](https://github.com/1525745393/flutter_music/commit/add3d681f0073cc25627fe323c23f5b18d2e29a6))
+
 ## [1.7.3](https://github.com/1525745393/flutter_music/compare/v1.7.2...v1.7.3) (2026-07-28)
 
 
