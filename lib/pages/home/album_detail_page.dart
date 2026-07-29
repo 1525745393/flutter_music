@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -52,12 +53,11 @@ class AlbumDetailPage extends ConsumerWidget {
                 fit: StackFit.expand,
                 children: [
                   album.coverUrl != null
-                      ? Image.network(
-                          album.coverUrl!,
+                      ? CachedNetworkImage(
+                          imageUrl: album.coverUrl!,
                           fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return _buildDefaultCover(context);
-                          },
+                          placeholder: (context, url) => _buildDefaultCover(context),
+                          errorWidget: (context, url, error) => _buildDefaultCover(context),
                         )
                       : _buildDefaultCover(context),
                   // 渐变遮罩
@@ -106,8 +106,8 @@ class AlbumDetailPage extends ConsumerWidget {
                   const SizedBox(height: 16),
                   FilledButton.icon(
                     onPressed: () async {
-                      final songs = await ref.read(albumSongsProvider(album).future);
-                      if (songs.isNotEmpty && context.mounted) {
+                      final songs = songsAsync.hasValue ? songsAsync.requireValue : null;
+                      if (songs != null && songs.isNotEmpty && context.mounted) {
                         await ref
                             .read(playerControllerProvider.notifier)
                             .setPlayQueue(songs, startIndex: 0);

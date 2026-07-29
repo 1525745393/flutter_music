@@ -74,7 +74,9 @@ class LibraryRepository {
 
       return onSuccess(body, api, sid);
     } on DioException catch (e) {
-      throw LibraryException('网络异常：${e.message ?? e.type.name}');
+      throw LibraryException(
+        '${errorPrefix ?? '请求失败'}：网络异常（${e.type.name}）',
+      );
     } on SynologyApiException catch (e) {
       // HTTP 401/403 且响应不是 JSON，可能是会话失效或权限问题
       if (e.statusCode == 401 || e.statusCode == 403) {

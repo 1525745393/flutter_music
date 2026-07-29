@@ -51,11 +51,18 @@ class FavoriteSong {
       artist: (map['artist'] as String?) ?? '未知歌手',
       album: (map['album'] as String?) ?? '未知专辑',
       coverUrl: map['coverUrl'] as String?,
-      duration: ((map['duration'] ?? 0) as num).toInt(),
-      rating: ((map['rating'] ?? 0) as num).toInt(),
+      duration: _toInt(map['duration'], 0),
+      rating: _toInt(map['rating'], 0),
       trackNumber: map['trackNumber'] as int?,
       createdAt: _parseDateTime(map['createdAt']),
     );
+  }
+
+  static int _toInt(dynamic value, int defaultValue) {
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is num) return value.toInt();
+    return defaultValue;
   }
 
   static DateTime _parseDateTime(dynamic value) {
@@ -63,7 +70,13 @@ class FavoriteSong {
       return DateTime.tryParse(value) ?? DateTime.now();
     }
     if (value is num) {
-      return DateTime.fromMillisecondsSinceEpoch(value.toInt());
+      var ms = value.toInt();
+      // 启发式检测：如果时间戳小于 ~10^12（约 2001 年），
+      // 说明可能是秒级时间戳（如 Unix timestamp），转换为毫秒。
+      if (ms < 10000000000) {
+        ms = ms * 1000;
+      }
+      return DateTime.fromMillisecondsSinceEpoch(ms);
     }
     return DateTime.now();
   }

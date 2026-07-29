@@ -8,6 +8,8 @@ import '../pages/home/library_page.dart';
 import '../pages/home/artists_page.dart';
 import '../pages/home/albums_page.dart';
 import '../pages/home/album_detail_page.dart';
+import '../pages/home/favorites_page.dart';
+import '../pages/home/search_page.dart';
 import '../pages/player/player_page.dart';
 import '../models/library/album.dart';
 import '../services/auth/auth_repository.dart';
@@ -73,6 +75,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: PlayerPage.routePath,
         name: PlayerPage.routeName,
         builder: (context, state) => const PlayerPage(),
+      ),
+      GoRoute(
+        path: SearchPage.routePath,
+        name: SearchPage.routeName,
+        builder: (context, state) => const SearchPage(),
+      ),
+      GoRoute(
+        path: FavoritesPage.routePath,
+        name: FavoritesPage.routeName,
+        builder: (context, state) => const FavoritesPage(),
       ),
     ],
   );

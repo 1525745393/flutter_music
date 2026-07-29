@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -59,14 +60,13 @@ class ArtistsPage extends ConsumerWidget {
                   leading: artist.coverUrl != null
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(24),
-                          child: Image.network(
-                            artist.coverUrl!,
+                          child: CachedNetworkImage(
+                            imageUrl: artist.coverUrl!,
                             width: 48,
                             height: 48,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return _buildDefaultAvatar(context);
-                            },
+                            placeholder: (context, url) => _buildDefaultAvatar(context),
+                            errorWidget: (context, url, error) => _buildDefaultAvatar(context),
                           ),
                         )
                       : _buildDefaultAvatar(context),

@@ -26,27 +26,32 @@ class SongItem {
   final int? trackNumber;
 
   /// 复制并更新部分字段
+  ///
+  /// 使用 sentinel 模式支持将 nullable 字段设置为 null，
+  /// 传 null 表示保持原值，传 [sentinel] 表示清空该字段。
   SongItem copyWith({
     String? id,
     String? title,
     String? artist,
     String? album,
-    String? coverUrl,
+    Object? coverUrl = sentinel,
     int? duration,
     int? rating,
-    int? trackNumber,
+    Object? trackNumber = sentinel,
   }) {
     return SongItem(
       id: id ?? this.id,
       title: title ?? this.title,
       artist: artist ?? this.artist,
       album: album ?? this.album,
-      coverUrl: coverUrl ?? this.coverUrl,
+      coverUrl: coverUrl is String? ? coverUrl : (coverUrl == sentinel ? this.coverUrl : null),
       duration: duration ?? this.duration,
       rating: rating ?? this.rating,
-      trackNumber: trackNumber ?? this.trackNumber,
+      trackNumber: trackNumber is int? ? trackNumber : (trackNumber == sentinel ? this.trackNumber : null),
     );
   }
+
+  static const sentinel = Object();
 
   factory SongItem.fromMap(Map<String, dynamic> map) {
     final additional = map['additional'];

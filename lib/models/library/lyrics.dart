@@ -41,7 +41,14 @@ class LyricsParser {
       for (final match in timeMatches) {
         final minutes = int.parse(match.group(1)!);
         final seconds = int.parse(match.group(2)!);
-        final milliseconds = int.parse(match.group(3)!);
+        final fractionalPart = match.group(3)!;
+
+        // LRC 格式：如果小数部分是 2 位数字（如 .50），表示百分之一秒，
+        // 需乘以 10 转换为毫秒；3 位数字（如 .500）已经是毫秒。
+        final milliseconds = fractionalPart.length == 2
+            ? int.parse(fractionalPart) * 10
+            : int.parse(fractionalPart);
+
         final time = minutes * 60000 + seconds * 1000 + milliseconds;
         lines.add(LyricLine(time: time, text: text));
       }
