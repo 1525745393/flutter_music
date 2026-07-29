@@ -261,7 +261,9 @@ class AuthRepository {
         deviceId: deviceId,
       );
     } on SynologyApiException catch (e) {
-      throw AuthException('登录失败：${e.message}');
+      throw AuthException(
+        '登录失败：${e.message}${e.errorCode != null ? '（错误码 ${e.errorCode}）' : ''}',
+      );
     }
   }
 
@@ -275,29 +277,31 @@ class AuthRepository {
     required String username,
     required String otpCode,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final savedDeviceId = prefs.getString(_keyDeviceId);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedDeviceId = prefs.getString(_keyDeviceId);
 
-    // 使用保存的 token 作为密码（AudioStation 文档版 2FA 流程）
-    final token = _twoFactorToken;
-    if (token == null || token.isEmpty) {
-      throw const AuthException('两步验证失败：未获取到验证令牌，请重新登录');
+      // 使用保存的 token 作为密码（AudioStation 文档版 2FA 流程）
+      final token = _twoFactorToken;
+      if (token == null || token.isEmpty) {
+        throw const AuthException('两步验证失败：未获取到验证令牌，请重新登录');
+      }
+
+      // 如果输入是 QuickConnect ID，解析为候选地址列表
+      final candidateUrls = await _resolveServerUrlsIfNeeded(serverUrl);
+
+      // 在多个候选地址上尝试 2FA 验证
+      await _tryTwoFactorOnServers(
+        candidateUrls: candidateUrls,
+        username: username,
+        password: token,
+        otpCode: otpCode,
+        deviceId: savedDeviceId,
+      );
+    } finally {
+      // 无论成功还是失败，都清除临时 token（失败时不再需要，成功时已无用）
+      _twoFactorToken = null;
     }
-
-    // 如果输入是 QuickConnect ID，解析为候选地址列表
-    final candidateUrls = await _resolveServerUrlsIfNeeded(serverUrl);
-
-    // 在多个候选地址上尝试 2FA 验证
-    await _tryTwoFactorOnServers(
-      candidateUrls: candidateUrls,
-      username: username,
-      password: token,
-      otpCode: otpCode,
-      deviceId: savedDeviceId,
-    );
-
-    // 清除临时 token
-    _twoFactorToken = null;
   }
 
   /// 在多个候选服务器地址上尝试 2FA 验证
@@ -416,6 +420,13 @@ class AuthRepository {
     // 加载 SynoToken
     _synoToken = prefs.getString(_keySynoToken);
     _cachedSession = AuthSession(serverUrl: serverUrl, sessionId: sessionId);
+
+    // 如果 _apiInfo 尚未加载（应用重启），异步恢复 API 版本信息
+    if (_apiInfo == null) {
+      // 不阻塞主流程，fire-and-forget 加载
+      _loadApiInfo(serverUrl, sessionId);
+    }
+
     return _cachedSession;
   }
 

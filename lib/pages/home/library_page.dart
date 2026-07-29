@@ -120,16 +120,12 @@ class LibraryPage extends ConsumerWidget {
                       color: isFavorite ? Colors.red : null,
                     ),
                     onPressed: () async {
-                      final repository = ref.read(
-                        favoritesRepositoryProvider,
-                      );
+                      final notifier = ref.read(favoritesListProvider.notifier);
                       if (isFavorite) {
-                        await repository.removeFavorite(song.id);
+                        await notifier.removeFavorite(song.id);
                       } else {
-                        await repository.addFavorite(song);
+                        await notifier.addFavorite(song);
                       }
-                      ref.invalidate(favoritesListProvider);
-                      ref.invalidate(favoriteIdsProvider);
                     },
                     tooltip: isFavorite ? '取消收藏' : '收藏',
                   ),

@@ -56,11 +56,11 @@ class Artist {
   /// 从 API 响应解析
   ///
   /// 数据结构：{ name: "xxx", additional: { avg_rating: { rating: 5 } } }
+  ///
+  /// 注意：coverUrl 不在此处解析，由 [LibraryRepository] 通过 [copyWith] 注入，
+  /// 因为封面 URL 需要 sid、歌手名等 API 上下文参数。
   factory Artist.fromMap(Map<String, dynamic> map) {
     final name = (map['name'] as String?)?.trim();
-    if (name == null || name.isEmpty) {
-      return const Artist(name: '未知歌手');
-    }
 
     // 从 additional 中读取补充信息
     // avg_rating 是对象格式：{ "rating": 5 }，参考 AudioStation 接口文档
@@ -70,7 +70,7 @@ class Artist {
         ((avgRatingMap?['rating'] as num?)?.toDouble()) ?? 0.0;
 
     return Artist(
-      name: name,
+      name: (name != null && name.isNotEmpty) ? name : '未知歌手',
       albumCount: (map['album_count'] as num?)?.toInt() ?? 0,
       songCount: (map['song_count'] as num?)?.toInt() ?? 0,
       avgRating: avgRating,

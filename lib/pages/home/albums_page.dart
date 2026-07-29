@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -132,12 +133,11 @@ class _AlbumCard extends StatelessWidget {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: album.coverUrl != null
-                  ? Image.network(
-                      album.coverUrl!,
+                  ? CachedNetworkImage(
+                      imageUrl: album.coverUrl!,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return _buildDefaultCover(context);
-                      },
+                      placeholder: (context, url) => _buildDefaultCover(context),
+                      errorWidget: (context, url, error) => _buildDefaultCover(context),
                     )
                   : _buildDefaultCover(context),
             ),

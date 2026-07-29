@@ -94,12 +94,14 @@ class PlayerController extends Notifier<PlayerState> {
         service.setServerUrl(session.serverUrl);
       }
       await service.loadSong(_playQueue[startIndex].id);
+      _errorMessage = null;
     }
   }
 
   Future<void> play() async {
     try {
       await ref.read(audioPlayerServiceProvider).play();
+      _errorMessage = null;
       state = PlayerState.playing;
     } catch (e) {
       _errorMessage = e.toString();
@@ -111,6 +113,7 @@ class PlayerController extends Notifier<PlayerState> {
   Future<void> pause() async {
     try {
       await ref.read(audioPlayerServiceProvider).pause();
+      _errorMessage = null;
       state = PlayerState.paused;
     } catch (e) {
       _errorMessage = e.toString();
@@ -122,6 +125,7 @@ class PlayerController extends Notifier<PlayerState> {
   Future<void> stop() async {
     try {
       await ref.read(audioPlayerServiceProvider).stop();
+      _errorMessage = null;
       state = PlayerState.idle;
     } catch (e) {
       _errorMessage = e.toString();
@@ -140,6 +144,7 @@ class PlayerController extends Notifier<PlayerState> {
       try {
         await ref.read(audioPlayerServiceProvider).loadSong(_currentSong!.id);
         await ref.read(audioPlayerServiceProvider).play();
+        _errorMessage = null;
         state = PlayerState.playing;
       } catch (e) {
         _currentIndex = oldIndex;
@@ -160,6 +165,7 @@ class PlayerController extends Notifier<PlayerState> {
       try {
         await ref.read(audioPlayerServiceProvider).loadSong(_currentSong!.id);
         await ref.read(audioPlayerServiceProvider).play();
+        _errorMessage = null;
         state = PlayerState.playing;
       } catch (e) {
         _currentIndex = oldIndex;

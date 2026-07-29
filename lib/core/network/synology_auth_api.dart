@@ -5,9 +5,6 @@ import 'package:dio/dio.dart';
 import 'synology_api_constants.dart';
 import 'synology_base_api.dart';
 
-/// 登录请求格式枚举
-enum _Format { postJson, postForm, getQuery }
-
 /// 群晖认证 API 模块。
 ///
 /// 只放登录/登出/会话校验等认证相关接口。
@@ -21,10 +18,12 @@ class SynologyAuthApi extends SynologyBaseApi {
 
   /// DSM 登录，返回原始响应数据（包含 success/data/error）。
   ///
-  /// 依次尝试三种请求格式，任意一种成功（success=true）即返回：
+  /// 依次尝试两种 POST 请求格式，任意一种成功（success=true）即返回：
   /// 1. POST + application/json
   /// 2. POST + application/x-www-form-urlencoded
-  /// 3. GET + queryParameters
+  ///
+  /// 注意：不使用 GET 格式发送登录请求，因为密码会出现在 URL 查询参数中，
+  /// 可能被服务器访问日志、代理日志或浏览器历史记录泄露。
   ///
   /// 如果 NAS 开启了两步验证，会返回 error.code: 403，
   /// 调用方需改用 [loginWithOtp] 传入 OTP 验证码。
@@ -44,7 +43,7 @@ class SynologyAuthApi extends SynologyBaseApi {
       SynologyApiConstants.authVersion,
     );
 
-    // 构造通用参数（version 为 String 格式，用于 form-urlencoded 和 GET）
+    // 构造通用参数（version 为 String 格式，用于 form-urlencoded）
     final paramsStringVersion = <String, dynamic>{
       'api': SynologyApiConstants.authApiName,
       'version': versionStr,
@@ -73,22 +72,20 @@ class SynologyAuthApi extends SynologyBaseApi {
       SynologyApiConstants.authPath,
     );
 
-    // 依次尝试三种请求格式，任意一种成功即返回。
+    // 依次尝试两种 POST 请求格式，任意一种成功即返回。
     // 如果返回了有效 JSON（success=false），说明格式兼容但业务失败（如密码错误、需要2FA），
     // 此时直接返回业务错误，不再 fallback，避免重复请求触发 IP 封禁。
-    final formats = <(_Format, dynamic, String?)>[
-      (_Format.postJson, jsonEncode(paramsIntVersion), 'application/json'),
-      (_Format.postForm, paramsStringVersion, 'application/x-www-form-urlencoded'),
-      (_Format.getQuery, paramsStringVersion, null),
+    final attempts = <(dynamic, String)>[
+      (jsonEncode(paramsIntVersion), 'application/json'),
+      (paramsStringVersion, 'application/x-www-form-urlencoded'),
     ];
 
     dynamic lastError;
 
-    for (final (format, data, contentType) in formats) {
+    for (final (data, contentType) in attempts) {
       try {
-        final response = await _sendRequest(
-          format: format,
-          path: requestPath,
+        final response = await _postWithRedirect(
+          requestPath,
           data: data,
           contentType: contentType,
         );
@@ -109,28 +106,6 @@ class SynologyAuthApi extends SynologyBaseApi {
       throw lastError;
     }
     throw StateError('登录请求失败：所有格式均未返回有效结果');
-  }
-
-  /// 按指定格式发送登录请求
-  ///
-  /// POST 格式通过 [_postWithRedirect] 处理重定向，GET 格式使用 Dio 默认行为。
-  Future<Response<dynamic>> _sendRequest({
-    required _Format format,
-    required String path,
-    required dynamic data,
-    required String? contentType,
-  }) async {
-    switch (format) {
-      case _Format.postJson:
-      case _Format.postForm:
-        return _postWithRedirect(
-          path,
-          data: data,
-          contentType: contentType!,
-        );
-      case _Format.getQuery:
-        return dio.get(path, queryParameters: data as Map<String, dynamic>);
-    }
   }
 
   /// 手动处理重定向的 POST 请求。

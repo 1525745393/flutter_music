@@ -345,7 +345,7 @@ class QuickConnectService {
       throw QuickConnectException('QuickConnect $command 响应为空');
     }
 
-    final errno = item['errno'];
+    final errno = _parseInt(item['errno']);
     if (errno != null && errno != 0) {
       final errinfo = item['errinfo'] ?? '';
       final errMsg = errinfo.toString().trim();
@@ -358,14 +358,26 @@ class QuickConnectService {
   }
 
   /// 判断输入是否偏向中国区
+  ///
+  /// 当前版本默认优先使用中国区服务器（面向中国用户）。
+  /// Global 服务器仍作为兜底在 China 之后尝试。
   static bool _preferChinaRegion(String input) {
     final lower = input.trim().toLowerCase();
     if (lower.contains('.quickconnect.cn') ||
         lower.contains('quickconnect.cn/')) {
       return true;
     }
-    // 默认优先尝试中国区
+    // 默认优先尝试中国区（面向中国用户的应用）
     return true;
+  }
+
+  /// 安全地将动态值解析为 int，兼容 String 和 num 类型
+  static int? _parseInt(dynamic value) {
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
   }
 
   /// 清理 QuickConnect ID 输入

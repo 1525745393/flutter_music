@@ -68,18 +68,13 @@ class Album {
   /// 从 API 响应解析
   ///
   /// 数据结构：{ name: "xxx", album_artist: "xxx", additional: { avg_rating: { rating: 5 } } }
+  ///
+  /// 注意：coverUrl 不在此处解析，由 [LibraryRepository] 通过 [copyWith] 注入，
+  /// 因为封面 URL 需要 sid、专辑名等 API 上下文参数。
   factory Album.fromMap(Map<String, dynamic> map) {
     final title = (map['name'] as String?)?.trim();
     final artist = (map['album_artist'] as String?)?.trim();
     final year = (map['year'] as num?)?.toInt();
-
-    if (title == null || title.isEmpty) {
-      return Album(
-        title: '未知专辑',
-        artist: artist ?? '未知艺术家',
-        year: year,
-      );
-    }
 
     // 从 additional 中读取补充信息
     // avg_rating 是对象格式：{ "rating": 5 }，参考 AudioStation 接口文档
@@ -91,8 +86,8 @@ class Album {
     final duration = (map['duration'] as num?)?.toInt() ?? 0;
 
     return Album(
-      title: title,
-      artist: artist ?? '未知艺术家',
+      title: (title != null && title.isNotEmpty) ? title : '未知专辑',
+      artist: (artist != null && artist.isNotEmpty) ? artist : '未知艺术家',
       songCount: songCount,
       duration: duration,
       avgRating: avgRating,

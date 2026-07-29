@@ -41,6 +41,9 @@ class AudioPlayerService {
   /// 当一首歌曲播放完成时触发，由上层 Controller 决定是否播放下一首。
   void Function()? onPlaybackCompleted;
 
+  /// 是否已完成初始化
+  bool _initialized = false;
+
   /// 播放状态流
   Stream<PlaybackStateEnum> get playbackState => _audioPlayer.playerStateStream.map(_mapPlayerState);
 
@@ -65,6 +68,7 @@ class AudioPlayerService {
 
   /// 初始化音频会话
   Future<void> initialize() async {
+    if (_initialized) return;
     try {
       _audioSession = await AudioSession.instance;
       await _audioSession!.configure(const AudioSessionConfiguration.music());
@@ -75,13 +79,24 @@ class AudioPlayerService {
           onPlaybackCompleted?.call();
         }
       });
+      _initialized = true;
     } catch (e) {
       debugPrint('音频会话初始化失败: $e');
+      // 即使初始化失败也标记为完成，避免永久阻塞
+      _initialized = true;
+    }
+  }
+
+  /// 确保服务已初始化后再执行操作
+  Future<void> _ensureInitialized() async {
+    if (!_initialized) {
+      await initialize();
     }
   }
 
   /// 加载指定歌曲并准备播放
   Future<void> loadSong(String songId) async {
+    await _ensureInitialized();
     try {
       final session = await _getAuthSession();
       if (session == null) {
@@ -120,6 +135,7 @@ class AudioPlayerService {
 
   /// 播放
   Future<void> play() async {
+    await _ensureInitialized();
     try {
       await _audioPlayer.play();
     } catch (e) {
@@ -130,6 +146,7 @@ class AudioPlayerService {
 
   /// 暂停
   Future<void> pause() async {
+    await _ensureInitialized();
     try {
       await _audioPlayer.pause();
     } catch (e) {
@@ -140,6 +157,7 @@ class AudioPlayerService {
 
   /// 停止
   Future<void> stop() async {
+    await _ensureInitialized();
     try {
       await _audioPlayer.stop();
     } catch (e) {
@@ -150,6 +168,7 @@ class AudioPlayerService {
 
   /// 跳转到指定位置
   Future<void> seekTo(Duration position) async {
+    await _ensureInitialized();
     try {
       await _audioPlayer.seek(position);
     } catch (e) {
@@ -160,6 +179,7 @@ class AudioPlayerService {
 
   /// 设置播放速度
   Future<void> setSpeed(double speed) async {
+    await _ensureInitialized();
     try {
       await _audioPlayer.setSpeed(speed);
     } catch (e) {
