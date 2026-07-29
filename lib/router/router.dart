@@ -10,6 +10,7 @@ import '../pages/home/albums_page.dart';
 import '../pages/home/album_detail_page.dart';
 import '../pages/player/player_page.dart';
 import '../models/library/album.dart';
+import '../models/auth/auth_session.dart';
 import '../services/auth/auth_repository.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -18,7 +19,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: LoginPage.routePath,
     redirect: (context, state) async {
-      final session = await authRepository.loadSession();
+      AuthSession? session;
+      try {
+        session = await authRepository.loadSession();
+      } catch (_) {
+        session = null;
+      }
       final isLoggedIn = session != null;
       final isLoginPage = state.matchedLocation == LoginPage.routePath;
 
