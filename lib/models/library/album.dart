@@ -40,8 +40,8 @@ class Album {
     int? songCount,
     int? duration,
     double? avgRating,
-    int? year,
-    String? coverUrl,
+    Object? year = _sentinel,
+    Object? coverUrl = _sentinel,
   }) {
     return Album(
       title: title ?? this.title,
@@ -49,10 +49,21 @@ class Album {
       songCount: songCount ?? this.songCount,
       duration: duration ?? this.duration,
       avgRating: avgRating ?? this.avgRating,
-      year: year ?? this.year,
-      coverUrl: coverUrl ?? this.coverUrl,
+      year: year is int ? year : (year == _sentinel ? this.year : null),
+      coverUrl: coverUrl is String? ? coverUrl : (coverUrl == _sentinel ? this.coverUrl : null),
     );
   }
+
+  static const _sentinel = Object();
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is Album && other.title == title && other.artist == artist;
+  }
+
+  @override
+  int get hashCode => Object.hash(title, artist);
 
   /// 从 API 响应解析
   ///

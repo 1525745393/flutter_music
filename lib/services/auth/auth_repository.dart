@@ -35,17 +35,25 @@ class AuthRepository {
   /// 2FA 临时 token（首次登录 403 时保存，提交验证码时使用）
   String? _twoFactorToken;
 
+  /// 缓存的会话信息（登录成功后设置，登出时清除）
+  AuthSession? _cachedSession;
+
   /// 获取缓存的 API 元信息
   SynologyApiInfo? get apiInfo => _apiInfo;
 
   /// 获取缓存的 SynoToken
   String? get synoToken => _synoToken;
 
+  /// 同步获取已缓存的会话（用于路由守卫等需要同步检查的场景）
+  AuthSession? get cachedSession => _cachedSession;
+
   Future<void> login({
     required String serverUrl,
     required String username,
     required String password,
   }) async {
+    _twoFactorToken = null;
+
     // 读取保存的 device_id
     final prefs = await SharedPreferences.getInstance();
     final savedDeviceId = prefs.getString(_keyDeviceId);
@@ -65,7 +73,7 @@ class AuthRepository {
   /// 在多个候选服务器地址上尝试登录
   ///
   /// 遍历候选地址列表，逐个尝试登录，第一个成功的地址即为最终地址。
-  /// 遇到 2FA 异常会直接向上抛出。
+  /// 遇到 2FA 异常（errorCode 403）会直接向上抛出。
   /// 所有地址都失败时抛出统一的错误信息。
   Future<void> _tryLoginOnServers({
     required List<String> candidateUrls,
@@ -92,7 +100,7 @@ class AuthRepository {
           final errorCode =
               (data['error'] as Map<String, dynamic>?)?['code'] as int?;
           // 2FA 需要特殊处理：保存 token，抛出让上层处理
-          if (errorCode == 403 || errorCode == 105) {
+          if (errorCode == 403) {
             // 从错误响应中提取 token（AudioStation 文档版 2FA 流程）
             final errorData =
                 (data['error'] as Map<String, dynamic>?)?['errors']
@@ -186,6 +194,9 @@ class AuthRepository {
     await prefs.setString(_keyServerUrl, serverUrl);
     await prefs.setString(_keyUsername, username);
     await prefs.setString(_keySessionId, sid);
+
+    // 缓存会话信息（用于同步路由守卫检查）
+    _cachedSession = AuthSession(serverUrl: serverUrl, sessionId: sid);
   }
 
   /// 登录成功后加载 API 元信息（版本自适应）
@@ -399,11 +410,13 @@ class AuthRepository {
     final serverUrl = prefs.getString(_keyServerUrl);
     final sessionId = prefs.getString(_keySessionId);
     if (serverUrl == null || sessionId == null) {
+      _cachedSession = null;
       return null;
     }
     // 加载 SynoToken
     _synoToken = prefs.getString(_keySynoToken);
-    return AuthSession(serverUrl: serverUrl, sessionId: sessionId);
+    _cachedSession = AuthSession(serverUrl: serverUrl, sessionId: sessionId);
+    return _cachedSession;
   }
 
   Future<void> clearSession() async {
@@ -411,6 +424,7 @@ class AuthRepository {
     await prefs.remove(_keySessionId);
     await prefs.remove(_keySynoToken);
     _synoToken = null;
+    _cachedSession = null;
   }
 
   String _mapLoginError(int? code) {

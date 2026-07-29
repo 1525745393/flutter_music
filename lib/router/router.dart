@@ -10,10 +10,25 @@ import '../pages/home/albums_page.dart';
 import '../pages/home/album_detail_page.dart';
 import '../pages/player/player_page.dart';
 import '../models/library/album.dart';
+import '../services/auth/auth_repository.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
+  final authRepository = ref.read(authRepositoryProvider);
+
   return GoRouter(
     initialLocation: LoginPage.routePath,
+    redirect: (context, state) {
+      final isLoggedIn = authRepository.cachedSession != null;
+      final isLoginPage = state.matchedLocation == LoginPage.routePath;
+
+      if (!isLoggedIn && !isLoginPage) {
+        return LoginPage.routePath;
+      }
+      if (isLoggedIn && isLoginPage) {
+        return HomePage.routePath;
+      }
+      return null;
+    },
     routes: [
       GoRoute(
         path: LoginPage.routePath,
@@ -47,11 +62,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: AlbumDetailPage.routePath,
         name: AlbumDetailPage.routeName,
         builder: (context, state) {
-          final album = state.extra as Album?;
-          if (album == null) {
+          final extra = state.extra;
+          if (extra is! Album) {
             return const Scaffold(body: Center(child: Text('无效的专辑信息')));
           }
-          return AlbumDetailPage(album: album);
+          return AlbumDetailPage(album: extra);
         },
       ),
       GoRoute(

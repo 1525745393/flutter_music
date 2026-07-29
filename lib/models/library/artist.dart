@@ -31,16 +31,27 @@ class Artist {
     int? albumCount,
     int? songCount,
     double? avgRating,
-    String? coverUrl,
+    Object? coverUrl = _sentinel,
   }) {
     return Artist(
       name: name ?? this.name,
       albumCount: albumCount ?? this.albumCount,
       songCount: songCount ?? this.songCount,
       avgRating: avgRating ?? this.avgRating,
-      coverUrl: coverUrl ?? this.coverUrl,
+      coverUrl: coverUrl is String? ? coverUrl : (coverUrl == _sentinel ? this.coverUrl : null),
     );
   }
+
+  static const _sentinel = Object();
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is Artist && other.name == name;
+  }
+
+  @override
+  int get hashCode => name.hashCode;
 
   /// 从 API 响应解析
   ///

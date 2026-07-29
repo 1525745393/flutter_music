@@ -21,6 +21,11 @@ class LibraryPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final songsAsync = ref.watch(songsProvider);
+    final favoriteIdsAsync = ref.watch(favoriteIdsProvider);
+    final favoriteIds = favoriteIdsAsync.maybeWhen(
+      data: (ids) => ids,
+      orElse: () => const <String>{},
+    );
 
     // 监听会话失效，自动跳转到登录页
     ref.listen<AsyncValue<List<SongItem>>>(
@@ -70,7 +75,7 @@ class LibraryPage extends ConsumerWidget {
               separatorBuilder: (context, index) => const Divider(height: 1),
               itemBuilder: (context, index) {
                 final song = songs[index];
-                final isFavoriteAsync = ref.watch(isFavoriteProvider(song.id));
+                final isFavorite = favoriteIds.contains(song.id);
 
                 return ListTile(
                   title: Text(song.title),
@@ -109,34 +114,24 @@ class LibraryPage extends ConsumerWidget {
                           ).colorScheme.surfaceContainerHighest,
                           child: const Icon(Icons.music_note),
                         ),
-                  trailing: isFavoriteAsync.when(
-                    data: (isFavorite) {
-                      return IconButton(
-                        icon: Icon(
-                          isFavorite ? Icons.favorite : Icons.favorite_border,
-                          color: isFavorite ? Colors.red : null,
-                        ),
-                        onPressed: () async {
-                          final repository = ref.read(
-                            favoritesRepositoryProvider,
-                          );
-                          if (isFavorite) {
-                            await repository.removeFavorite(song.id);
-                          } else {
-                            await repository.addFavorite(song);
-                          }
-                        },
-                        tooltip: isFavorite ? '取消收藏' : '收藏',
+                  trailing: IconButton(
+                    icon: Icon(
+                      isFavorite ? Icons.favorite : Icons.favorite_border,
+                      color: isFavorite ? Colors.red : null,
+                    ),
+                    onPressed: () async {
+                      final repository = ref.read(
+                        favoritesRepositoryProvider,
                       );
+                      if (isFavorite) {
+                        await repository.removeFavorite(song.id);
+                      } else {
+                        await repository.addFavorite(song);
+                      }
+                      ref.invalidate(favoritesListProvider);
+                      ref.invalidate(favoriteIdsProvider);
                     },
-                    loading: () => const IconButton(
-                      icon: Icon(Icons.favorite_border),
-                      onPressed: null,
-                    ),
-                    error: (error, stackTrace) => const IconButton(
-                      icon: Icon(Icons.favorite_border),
-                      onPressed: null,
-                    ),
+                    tooltip: isFavorite ? '取消收藏' : '收藏',
                   ),
                   onTap: () async {
                     // 设置当前播放的歌曲和播放队列

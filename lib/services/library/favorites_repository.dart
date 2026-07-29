@@ -15,34 +15,49 @@ class FavoritesException implements Exception {
 class FavoritesRepository {
   static const String _key = 'favorites';
 
+  List<FavoriteSong>? _cached;
+
   Future<List<FavoriteSong>> getAllFavorites() async {
+    if (_cached != null) return List.unmodifiable(_cached!);
     final prefs = await SharedPreferences.getInstance();
     final jsonString = prefs.getString(_key);
     if (jsonString == null || jsonString.isEmpty) {
+      _cached = [];
       return [];
     }
-    final List<dynamic> jsonList = jsonDecode(jsonString) as List<dynamic>;
-    return jsonList
-        .map((json) => FavoriteSong.fromMap(json as Map<String, dynamic>))
-        .toList()
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    try {
+      final List<dynamic> jsonList = jsonDecode(jsonString) as List<dynamic>;
+      _cached = jsonList
+          .whereType<Map<String, dynamic>>()
+          .map((json) => FavoriteSong.fromMap(json))
+          .toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return List.unmodifiable(_cached!);
+    } catch (e) {
+      _cached = [];
+      return [];
+    }
   }
 
   Future<void> addFavorite(SongItem song) async {
     final favorites = await getAllFavorites();
-    final existingIndex = favorites.indexWhere((f) => f.songId == song.id);
+    final mutable = List<FavoriteSong>.from(favorites);
+    final existingIndex = mutable.indexWhere((f) => f.songId == song.id);
     if (existingIndex >= 0) {
       return;
     }
     final favorite = FavoriteSong.fromSongItem(song);
-    favorites.insert(0, favorite);
-    await _saveFavorites(favorites);
+    mutable.insert(0, favorite);
+    _cached = mutable;
+    await _saveFavorites(mutable);
   }
 
   Future<void> removeFavorite(String songId) async {
     final favorites = await getAllFavorites();
-    favorites.removeWhere((f) => f.songId == songId);
-    await _saveFavorites(favorites);
+    final mutable = List<FavoriteSong>.from(favorites);
+    mutable.removeWhere((f) => f.songId == songId);
+    _cached = mutable;
+    await _saveFavorites(mutable);
   }
 
   Future<bool> isFavorite(String songId) async {
@@ -53,6 +68,7 @@ class FavoritesRepository {
   Future<void> clearAll() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_key);
+    _cached = [];
   }
 
   Future<void> _saveFavorites(List<FavoriteSong> favorites) async {
@@ -66,10 +82,25 @@ final favoritesRepositoryProvider = Provider<FavoritesRepository>((ref) {
   return FavoritesRepository();
 });
 
-final favoritesListProvider = FutureProvider<List<FavoriteSong>>((ref) async {
-  final repository = ref.read(favoritesRepositoryProvider);
-  return repository.getAllFavorites();
-});
+final favoritesListProvider = AsyncNotifierProvider<FavoritesNotifier, List<FavoriteSong>>(
+  FavoritesNotifier.new,
+);
+
+class FavoritesNotifier extends AsyncNotifier<List<FavoriteSong>> {
+  @override
+  Future<List<FavoriteSong>> build() async {
+    final repository = ref.read(favoritesRepositoryProvider);
+    return repository.getAllFavorites();
+  }
+
+  Future<void> refresh() async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      final repository = ref.read(favoritesRepositoryProvider);
+      return repository.getAllFavorites();
+    });
+  }
+}
 
 final isFavoriteProvider = FutureProvider.family<bool, String>((
   ref,
@@ -77,4 +108,9 @@ final isFavoriteProvider = FutureProvider.family<bool, String>((
 ) async {
   final repository = ref.read(favoritesRepositoryProvider);
   return repository.isFavorite(songId);
+});
+
+final favoriteIdsProvider = FutureProvider<Set<String>>((ref) async {
+  final favorites = await ref.watch(favoritesListProvider.future);
+  return favorites.map((f) => f.songId).toSet();
 });

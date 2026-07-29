@@ -46,17 +46,26 @@ class FavoriteSong {
 
   factory FavoriteSong.fromMap(Map<String, dynamic> map) {
     return FavoriteSong(
-      songId: map['songId'] as String,
-      title: map['title'] as String,
-      artist: map['artist'] as String,
-      album: map['album'] as String,
+      songId: (map['songId'] as String?) ?? '',
+      title: (map['title'] as String?) ?? '未知歌曲',
+      artist: (map['artist'] as String?) ?? '未知歌手',
+      album: (map['album'] as String?) ?? '未知专辑',
       coverUrl: map['coverUrl'] as String?,
-      // 使用 ?? 0 兜底，兼容旧版本持久化数据；as num 再 toInt 防止 double 类型
       duration: ((map['duration'] ?? 0) as num).toInt(),
       rating: ((map['rating'] ?? 0) as num).toInt(),
       trackNumber: map['trackNumber'] as int?,
-      createdAt: DateTime.parse(map['createdAt'] as String),
+      createdAt: _parseDateTime(map['createdAt']),
     );
+  }
+
+  static DateTime _parseDateTime(dynamic value) {
+    if (value is String) {
+      return DateTime.tryParse(value) ?? DateTime.now();
+    }
+    if (value is num) {
+      return DateTime.fromMillisecondsSinceEpoch(value.toInt());
+    }
+    return DateTime.now();
   }
 
   Map<String, dynamic> toMap() {
