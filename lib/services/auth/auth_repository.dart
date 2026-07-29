@@ -35,11 +35,17 @@ class AuthRepository {
   /// 2FA 临时 token（首次登录 403 时保存，提交验证码时使用）
   String? _twoFactorToken;
 
+  /// 缓存的会话信息（登录成功后设置，登出时清除）
+  AuthSession? _cachedSession;
+
   /// 获取缓存的 API 元信息
   SynologyApiInfo? get apiInfo => _apiInfo;
 
   /// 获取缓存的 SynoToken
   String? get synoToken => _synoToken;
+
+  /// 同步获取已缓存的会话（用于路由守卫等需要同步检查的场景）
+  AuthSession? get cachedSession => _cachedSession;
 
   Future<void> login({
     required String serverUrl,
@@ -188,6 +194,9 @@ class AuthRepository {
     await prefs.setString(_keyServerUrl, serverUrl);
     await prefs.setString(_keyUsername, username);
     await prefs.setString(_keySessionId, sid);
+
+    // 缓存会话信息（用于同步路由守卫检查）
+    _cachedSession = AuthSession(serverUrl: serverUrl, sessionId: sid);
   }
 
   /// 登录成功后加载 API 元信息（版本自适应）
@@ -401,11 +410,13 @@ class AuthRepository {
     final serverUrl = prefs.getString(_keyServerUrl);
     final sessionId = prefs.getString(_keySessionId);
     if (serverUrl == null || sessionId == null) {
+      _cachedSession = null;
       return null;
     }
     // 加载 SynoToken
     _synoToken = prefs.getString(_keySynoToken);
-    return AuthSession(serverUrl: serverUrl, sessionId: sessionId);
+    _cachedSession = AuthSession(serverUrl: serverUrl, sessionId: sessionId);
+    return _cachedSession;
   }
 
   Future<void> clearSession() async {
@@ -413,6 +424,7 @@ class AuthRepository {
     await prefs.remove(_keySessionId);
     await prefs.remove(_keySynoToken);
     _synoToken = null;
+    _cachedSession = null;
   }
 
   String _mapLoginError(int? code) {

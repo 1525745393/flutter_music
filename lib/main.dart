@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'router/router.dart';
+import 'services/auth/auth_repository.dart';
 
 class MusicApp extends ConsumerWidget {
   const MusicApp({super.key});
@@ -30,14 +31,12 @@ class MusicApp extends ConsumerWidget {
   }
 }
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
-    if (kReleaseMode) {
-      // 在生产模式下由全局 handler 接管，避免红屏
-    }
+    if (kReleaseMode) {}
   };
 
   WidgetsBinding.instance.platformDispatcher.onError = (error, stack) {
@@ -45,5 +44,15 @@ void main() {
     return true;
   };
 
-  runApp(const ProviderScope(child: MusicApp()));
+  final container = ProviderContainer();
+  try {
+    await container.read(authRepositoryProvider).loadSession();
+  } catch (_) {}
+
+  runApp(
+    UncontrolledProviderScope(
+      container: container,
+      child: const MusicApp(),
+    ),
+  );
 }
