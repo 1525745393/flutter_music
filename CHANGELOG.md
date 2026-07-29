@@ -1,3 +1,13 @@
+## [1.7.5](https://github.com/1525745393/flutter_music/compare/v1.7.4...v1.7.5) (2026-07-29)
+
+
+### Bug Fixes
+
+* AsyncValue.valueOrNull 不存在，改用 maybeWhen ([e3130b7](https://github.com/1525745393/flutter_music/commit/e3130b76f5919ae13404cf44e595424afd42a4d3))
+* router redirect 添加 try-catch 防止 SharedPreferences 未初始化时崩溃 ([7d4bccd](https://github.com/1525745393/flutter_music/commit/7d4bccd089722d918a9da555e3e4398a8aa3bf71))
+* 全项目代码审查修复 (17项) ([494b41e](https://github.com/1525745393/flutter_music/commit/494b41e88ce96d347804a29fd4ecc5f698eedfef))
+* 路由守卫改为同步检查 cachedSession，修复测试环境 SharedPreferences 问题 ([1e6f0a0](https://github.com/1525745393/flutter_music/commit/1e6f0a017b2e81c03bd2d75c7b8bf4e6a76d4cfd))
+
 ## [1.7.4](https://github.com/1525745393/flutter_music/compare/v1.7.3...v1.7.4) (2026-07-28)
 
 
