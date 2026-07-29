@@ -22,7 +22,10 @@ class LibraryPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final songsAsync = ref.watch(songsProvider);
     final favoriteIdsAsync = ref.watch(favoriteIdsProvider);
-    final favoriteIds = favoriteIdsAsync.valueOrNull ?? const {};
+    final favoriteIds = favoriteIdsAsync.maybeWhen(
+      data: (ids) => ids,
+      orElse: () => const <String>{},
+    );
 
     // 监听会话失效，自动跳转到登录页
     ref.listen<AsyncValue<List<SongItem>>>(
