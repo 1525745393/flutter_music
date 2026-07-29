@@ -1,3 +1,16 @@
+# [1.8.0](https://github.com/1525745393/flutter_music/compare/v1.7.5...v1.8.0) (2026-07-29)
+
+
+### Bug Fixes
+
+* player_page 在 error 状态时显示 playerErrorMessageProvider 的错误消息 ([a5cc86a](https://github.com/1525745393/flutter_music/commit/a5cc86ae6d00ce57f6241453648d44d1b9ebce21))
+* 第三轮代码审查修复 (22项 P0/P1/P2 问题) ([e44938d](https://github.com/1525745393/flutter_music/commit/e44938d08e784bf1b2b34b80ecadf58a90acc6af))
+
+
+### Features
+
+* 首页 UI 改造 + 搜索 + 收藏页 + 迷你播放栏 ([387de7d](https://github.com/1525745393/flutter_music/commit/387de7d89bc457654c458465cba4fb6281c24604))
+
 ## [1.7.5](https://github.com/1525745393/flutter_music/compare/v1.7.4...v1.7.5) (2026-07-29)
 
 
