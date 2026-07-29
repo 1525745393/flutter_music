@@ -23,6 +23,7 @@ class PlayerPage extends ConsumerWidget {
     final positionAsync = ref.watch(positionStreamProvider);
     final durationAsync = ref.watch(durationStreamProvider);
     final lyricsAsync = ref.watch(lyricsProvider);
+    final errorMessage = ref.watch(playerErrorMessageProvider);
 
     ref.listen(lyricsProvider, (previous, next) {
       next.whenOrNull(
@@ -109,6 +110,20 @@ class PlayerPage extends ConsumerWidget {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 24),
+
+                  // 错误提示
+                  if (playerState == PlayerState.error && errorMessage != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Text(
+                        errorMessage,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                          fontSize: 13,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
 
                   // 歌词显示
                   _buildLyricsSection(context, lyricsAsync, positionAsync),
