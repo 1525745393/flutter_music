@@ -209,8 +209,11 @@ final audioPlayerServiceProvider = Provider<AudioPlayerService>((ref) {
   final service = AudioPlayerService();
   final authRepository = ref.read(authRepositoryProvider);
   service.setAuthRepository(authRepository);
-  // 在 Provider 销毁时清理音频资源
-  ref.onDispose(service.dispose);
+
+  ref.onDispose(() {
+    service.onPlaybackCompleted = null;
+    service.dispose();
+  });
   return service;
 });
 

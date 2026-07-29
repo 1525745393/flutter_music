@@ -17,16 +17,23 @@ enum PlayerState {
 /// 作为播放器状态的唯一数据源，统一维护播放队列、当前索引和当前歌曲。
 /// [AudioPlayerService] 仅负责音频播放控制，所有队列状态由本类管理。
 class PlayerController extends Notifier<PlayerState> {
+  String? _errorMessage;
+
+  String? get errorMessage => _errorMessage;
+
   @override
   PlayerState build() {
-    // 监听音频播放服务状态
     ref.listen(playbackStateProvider, (previous, next) {
       if (next.value != null) {
         _updatePlayerState(next.value!);
       }
     });
 
-    // 初始化音频服务
+    ref.onDispose(() {
+      final service = ref.read(audioPlayerServiceProvider);
+      service.onPlaybackCompleted = null;
+    });
+
     _initializeAudioService();
 
     return PlayerState.idle;
@@ -90,40 +97,39 @@ class PlayerController extends Notifier<PlayerState> {
     }
   }
 
-  /// 播放
   Future<void> play() async {
     try {
       await ref.read(audioPlayerServiceProvider).play();
       state = PlayerState.playing;
     } catch (e) {
+      _errorMessage = e.toString();
       state = PlayerState.error;
-      throw Exception('播放失败: $e');
+      rethrow;
     }
   }
 
-  /// 暂停
   Future<void> pause() async {
     try {
       await ref.read(audioPlayerServiceProvider).pause();
       state = PlayerState.paused;
     } catch (e) {
+      _errorMessage = e.toString();
       state = PlayerState.error;
-      throw Exception('暂停失败: $e');
+      rethrow;
     }
   }
 
-  /// 停止
   Future<void> stop() async {
     try {
       await ref.read(audioPlayerServiceProvider).stop();
       state = PlayerState.idle;
     } catch (e) {
+      _errorMessage = e.toString();
       state = PlayerState.error;
-      throw Exception('停止失败: $e');
+      rethrow;
     }
   }
 
-  /// 下一首
   Future<void> next() async {
     if (_currentIndex < _playQueue.length - 1) {
       final oldIndex = _currentIndex;
@@ -136,15 +142,14 @@ class PlayerController extends Notifier<PlayerState> {
         await ref.read(audioPlayerServiceProvider).play();
         state = PlayerState.playing;
       } catch (e) {
-        // 加载失败时回滚到原来的歌曲
         _currentIndex = oldIndex;
         _currentSong = oldSong;
+        _errorMessage = e.toString();
         state = PlayerState.error;
       }
     }
   }
 
-  /// 上一首
   Future<void> previous() async {
     if (_currentIndex > 0) {
       final oldIndex = _currentIndex;
@@ -157,9 +162,9 @@ class PlayerController extends Notifier<PlayerState> {
         await ref.read(audioPlayerServiceProvider).play();
         state = PlayerState.playing;
       } catch (e) {
-        // 加载失败时回滚到原来的歌曲
         _currentIndex = oldIndex;
         _currentSong = oldSong;
+        _errorMessage = e.toString();
         state = PlayerState.error;
       }
     }
@@ -200,6 +205,7 @@ class PlayerController extends Notifier<PlayerState> {
     _currentSong = null;
     _playQueue = [];
     _currentIndex = -1;
+    _errorMessage = null;
     state = PlayerState.idle;
   }
 }
@@ -208,6 +214,11 @@ class PlayerController extends Notifier<PlayerState> {
 final playerControllerProvider = NotifierProvider<PlayerController, PlayerState>(
   PlayerController.new,
 );
+
+final playerErrorMessageProvider = Provider<String?>((ref) {
+  ref.watch(playerControllerProvider);
+  return ref.read(playerControllerProvider.notifier).errorMessage;
+});
 
 /// 当前播放歌曲的 Provider
 final currentSongProvider = Provider<SongItem?>((ref) {

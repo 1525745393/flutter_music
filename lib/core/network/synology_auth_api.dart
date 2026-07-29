@@ -26,7 +26,7 @@ class SynologyAuthApi extends SynologyBaseApi {
   /// 2. POST + application/x-www-form-urlencoded
   /// 3. GET + queryParameters
   ///
-  /// 如果 NAS 开启了两步验证，会返回 error.code: 403 或 105，
+  /// 如果 NAS 开启了两步验证，会返回 error.code: 403，
   /// 调用方需改用 [loginWithOtp] 传入 OTP 验证码。
   ///
   /// 官方文档确认：POST 请求，version=6，返回 sid/did/synotoken
@@ -160,23 +160,15 @@ class SynologyAuthApi extends SynologyBaseApi {
       visitedUrls.add(currentUrl);
 
       Response<dynamic> response;
-      try {
-        response = await dio.post(
-          currentUrl,
-          data: data,
-          options: Options(
-            contentType: contentType,
-            followRedirects: false,
-            validateStatus: (status) => status != null,
-          ),
-        );
-      } on DioException catch (e) {
-        if (e.type == DioExceptionType.badResponse && e.response != null) {
-          response = e.response!;
-        } else {
-          rethrow;
-        }
-      }
+      response = await dio.post(
+        currentUrl,
+        data: data,
+        options: Options(
+          contentType: contentType,
+          followRedirects: false,
+          validateStatus: (status) => status != null,
+        ),
+      );
 
       // 判断是否为重定向响应（3xx）
       final statusCode = response.statusCode;

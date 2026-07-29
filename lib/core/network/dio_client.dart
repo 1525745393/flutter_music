@@ -21,6 +21,10 @@ class DioClient {
       dio.httpClientAdapter = IOHttpClientAdapter(
         createHttpClient: () {
           final client = HttpClient();
+          // 放行所有 SSL 证书校验 — 权衡安全与可用性的设计决策。
+          // 群晖 QuickConnect 场景下，NAS 通常使用自签名证书或 QuickConnect relay
+          // 服务器的动态域名，证书校验会因为域名不匹配而失败。
+          // 如果不放行，自签名证书和 relay 连接都会直接断开。
           client.badCertificateCallback =
               (X509Certificate cert, String host, int port) => true;
           return client;

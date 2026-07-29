@@ -1,10 +1,12 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import 'player_controller.dart';
 import '../../models/library/lyrics.dart';
 import '../../services/library/library_repository.dart';
+import '../login/login_page.dart';
 
 class PlayerPage extends ConsumerWidget {
   const PlayerPage({super.key});
@@ -21,6 +23,20 @@ class PlayerPage extends ConsumerWidget {
     final positionAsync = ref.watch(positionStreamProvider);
     final durationAsync = ref.watch(durationStreamProvider);
     final lyricsAsync = ref.watch(lyricsProvider);
+
+    ref.listen(lyricsProvider, (previous, next) {
+      next.whenOrNull(
+        error: (error, stackTrace) {
+          if (error is SessionExpiredException) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (context.mounted) {
+                context.go(LoginPage.routePath);
+              }
+            });
+          }
+        },
+      );
+    });
 
     return Scaffold(
       appBar: AppBar(

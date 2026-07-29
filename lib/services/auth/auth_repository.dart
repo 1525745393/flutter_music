@@ -46,6 +46,8 @@ class AuthRepository {
     required String username,
     required String password,
   }) async {
+    _twoFactorToken = null;
+
     // 读取保存的 device_id
     final prefs = await SharedPreferences.getInstance();
     final savedDeviceId = prefs.getString(_keyDeviceId);
@@ -65,7 +67,7 @@ class AuthRepository {
   /// 在多个候选服务器地址上尝试登录
   ///
   /// 遍历候选地址列表，逐个尝试登录，第一个成功的地址即为最终地址。
-  /// 遇到 2FA 异常会直接向上抛出。
+  /// 遇到 2FA 异常（errorCode 403）会直接向上抛出。
   /// 所有地址都失败时抛出统一的错误信息。
   Future<void> _tryLoginOnServers({
     required List<String> candidateUrls,
@@ -92,7 +94,7 @@ class AuthRepository {
           final errorCode =
               (data['error'] as Map<String, dynamic>?)?['code'] as int?;
           // 2FA 需要特殊处理：保存 token，抛出让上层处理
-          if (errorCode == 403 || errorCode == 105) {
+          if (errorCode == 403) {
             // 从错误响应中提取 token（AudioStation 文档版 2FA 流程）
             final errorData =
                 (data['error'] as Map<String, dynamic>?)?['errors']

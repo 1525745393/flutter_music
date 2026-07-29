@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -17,6 +18,13 @@ class MusicApp extends ConsumerWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
       ),
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.blue,
+          brightness: Brightness.dark,
+        ),
+        useMaterial3: true,
+      ),
       routerConfig: router,
     );
   }
@@ -24,5 +32,18 @@ class MusicApp extends ConsumerWidget {
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    if (kReleaseMode) {
+      // 在生产模式下由全局 handler 接管，避免红屏
+    }
+  };
+
+  WidgetsBinding.instance.platformDispatcher.onError = (error, stack) {
+    debugPrint('未捕获错误: $error\n$stack');
+    return true;
+  };
+
   runApp(const ProviderScope(child: MusicApp()));
 }
