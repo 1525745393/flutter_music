@@ -1,3 +1,11 @@
+# [1.9.0](https://github.com/1525745393/flutter_music/compare/v1.8.0...v1.9.0) (2026-07-30)
+
+
+### Features
+
+* 最近播放（自动记录播放历史 + 展示页） ([54cf25e](https://github.com/1525745393/flutter_music/commit/54cf25ee165f9d2d760636e27b89ab033729a987))
+* 文件夹视图 + 歌曲排序 + 夜间模式 + 倍速播放 ([f60e77e](https://github.com/1525745393/flutter_music/commit/f60e77ebbbeea790bd0964a5d849c52e1b26099b))
+
 # [1.8.0](https://github.com/1525745393/flutter_music/compare/v1.7.5...v1.8.0) (2026-07-29)
 
 
