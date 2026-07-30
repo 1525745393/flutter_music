@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../services/auth/auth_repository.dart';
 import '../../services/library/library_repository.dart';
+import '../../services/theme/theme_provider.dart';
 import '../../widgets/mini_player_bar.dart';
 import '../login/login_page.dart';
 import '../player/player_page.dart';
@@ -13,6 +14,8 @@ import 'library_page.dart';
 import 'search_page.dart';
 import 'artists_page.dart';
 import 'albums_page.dart';
+import 'folders_page.dart';
+import 'recent_plays_page.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -72,6 +75,22 @@ class HomePage extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: () => ref.read(themeModeProvider.notifier).toggle(),
+                    icon: Icon(
+                      ref.watch(themeModeProvider) == ThemeMode.dark
+                          ? Icons.light_mode_rounded
+                          : Icons.dark_mode_rounded,
+                    ),
+                    tooltip: '切换主题',
+                    style: IconButton.styleFrom(
+                      backgroundColor: Theme.of(context)
+                          .colorScheme
+                          .surfaceContainerHighest
+                          .withValues(alpha: 0.6),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
                   IconButton(
                     onPressed: () async {
                       await ref.read(authRepositoryProvider).clearSession();
@@ -143,6 +162,16 @@ class HomePage extends ConsumerWidget {
                           color: Colors.pink,
                           onTap: () {
                             context.push('/favorites');
+                          },
+                        ),
+                        const SizedBox(height: 10),
+                        _PlaylistCard(
+                          icon: Icons.history_rounded,
+                          title: '最近播放',
+                          subtitle: '播放历史记录',
+                          color: Colors.blueGrey,
+                          onTap: () {
+                            context.push(RecentPlaysPage.routePath);
                           },
                         ),
 
@@ -335,7 +364,7 @@ class _CategoryGrid extends StatelessWidget {
           label: '文件夹',
           subtitle: null,
           color: Colors.amber,
-          onTap: () => context.push('/folders'),
+          onTap: () => context.push(FoldersPage.routePath),
         ),
         _CategoryItem(
           icon: Icons.shuffle_rounded,

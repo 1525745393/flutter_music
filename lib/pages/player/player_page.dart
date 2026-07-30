@@ -23,6 +23,7 @@ class PlayerPage extends ConsumerWidget {
     final currentIndex = ref.watch(currentIndexProvider);
     final lyricsAsync = ref.watch(lyricsProvider);
     final errorMessage = ref.watch(playerErrorMessageProvider);
+    final speedAsync = ref.watch(playbackSpeedProvider);
 
     ref.listen(lyricsProvider, (previous, next) {
       next.whenOrNull(
@@ -158,6 +159,11 @@ class PlayerPage extends ConsumerWidget {
                         ),
                       ],
                     ),
+
+                    const SizedBox(height: 8),
+
+                    // 倍速控制
+                    _SpeedControl(speedAsync: speedAsync),
 
                     const SizedBox(height: 8),
 
@@ -567,3 +573,52 @@ final lyricsProvider = FutureProvider<List<LyricLine>>((ref) async {
   final libraryRepository = ref.read(libraryRepositoryProvider);
   return await libraryRepository.fetchLyrics(currentSong.id);
 });
+
+/// 倍速控制组件
+class _SpeedControl extends StatelessWidget {
+  const _SpeedControl({required this.speedAsync});
+
+  final double speedAsync;
+
+  static const _speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: _speeds.map((speed) {
+        final isActive = (speedAbsolute(speedAsync) - speed).abs() < 0.01;
+        return Consumer(
+          builder: (context, ref, child) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: ChoiceChip(
+                label: Text(
+                  speed == 1.0 ? '1×' : '${speed}x',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: isActive
+                        ? theme.colorScheme.onPrimary
+                        : theme.colorScheme.onSurface,
+                  ),
+                ),
+                selected: isActive,
+                selectedColor: theme.colorScheme.primary,
+                onSelected: (_) {
+                  ref.read(playbackSpeedProvider.notifier).set(speed);
+                  ref.read(playerControllerProvider.notifier).setPlaybackSpeed(speed);
+                },
+                visualDensity: VisualDensity.compact,
+              ),
+            );
+          },
+        );
+      }).toList(),
+    );
+  }
+
+  /// 获取速度绝对值，用于浮点比较
+  static double speedAbsolute(double speed) => speed;
+}

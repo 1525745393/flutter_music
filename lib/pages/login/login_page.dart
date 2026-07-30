@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/network/synology_api.dart';
 import '../../services/auth/auth_repository.dart';
+import '../../utils/login_url_builder.dart';
 import '../home/home_page.dart';
 import './login_controller.dart';
 
@@ -42,66 +43,17 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   }
 
   /// 从 URL 中提取主机地址（不含协议和端口）
-  String _extractHost(String url) {
-    var host = url.trim();
-    // 移除协议前缀
-    if (host.startsWith('https://')) {
-      host = host.substring(8);
-    } else if (host.startsWith('http://')) {
-      host = host.substring(7);
-    }
-    // 移除端口和路径
-    final colonIndex = host.indexOf(':');
-    if (colonIndex > 0) {
-      host = host.substring(0, colonIndex);
-    }
-    final slashIndex = host.indexOf('/');
-    if (slashIndex > 0) {
-      host = host.substring(0, slashIndex);
-    }
-    return host;
-  }
+  String _extractHost(String url) => LoginUrlBuilder.extractHost(url);
 
   /// 从 URL 中提取端口号
-  String _extractPort(String url) {
-    var host = url.trim();
-    // 移除协议前缀
-    if (host.startsWith('https://') || host.startsWith('http://')) {
-      host = host.substring(host.indexOf('://') + 3);
-    }
-    final colonIndex = host.indexOf(':');
-    if (colonIndex > 0) {
-      final afterColon = host.substring(colonIndex + 1);
-      final slashIndex = afterColon.indexOf('/');
-      if (slashIndex > 0) {
-        return afterColon.substring(0, slashIndex);
-      }
-      return afterColon;
-    }
-    return '5000';
-  }
+  String _extractPort(String url) => LoginUrlBuilder.extractPort(url);
 
   /// 拼接完整的服务器 URL
-  String get _fullServerUrl {
-    final host = _serverController.text.trim();
-    final port = _portController.text.trim();
-    final scheme = _useHttps ? 'https' : 'http';
-
-    // 如果输入是 QuickConnect ID，直接返回
-    if (QuickConnectService.isQuickConnectId(host)) {
-      return host;
-    }
-
-    // 如果已经包含协议前缀，直接返回
-    if (host.startsWith('http://') || host.startsWith('https://')) {
-      return host;
-    }
-
-    if (port.isNotEmpty && port != '5000') {
-      return '$scheme://$host:$port';
-    }
-    return '$scheme://$host';
-  }
+  String get _fullServerUrl => LoginUrlBuilder.buildServerUrl(
+        host: _serverController.text,
+        port: _portController.text,
+        useHttps: _useHttps,
+      );
 
   bool _isValidHost(String input) {
     final text = input.trim().toLowerCase();

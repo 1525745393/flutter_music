@@ -10,6 +10,8 @@ import '../pages/home/albums_page.dart';
 import '../pages/home/album_detail_page.dart';
 import '../pages/home/favorites_page.dart';
 import '../pages/home/search_page.dart';
+import '../pages/home/folders_page.dart';
+import '../pages/home/recent_plays_page.dart';
 import '../pages/player/player_page.dart';
 import '../models/library/album.dart';
 import '../services/auth/auth_repository.dart';
@@ -85,6 +87,25 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: FavoritesPage.routePath,
         name: FavoritesPage.routeName,
         builder: (context, state) => const FavoritesPage(),
+      ),
+      GoRoute(
+        path: FoldersPage.routePath,
+        name: FoldersPage.routeName,
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is Map<String, String?>) {
+            return FoldersPage(
+              parentId: extra['parentId'],
+              title: extra['title'],
+            );
+          }
+          return const FoldersPage();
+        },
+      ),
+      GoRoute(
+        path: RecentPlaysPage.routePath,
+        name: RecentPlaysPage.routeName,
+        builder: (context, state) => const RecentPlaysPage(),
       ),
     ],
   );

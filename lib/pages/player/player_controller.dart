@@ -2,6 +2,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/library/song_item.dart';
 import '../../services/player/audio_player_service.dart';
 import '../../services/auth/auth_repository.dart';
+import '../../services/library/recent_plays_repository.dart';
+
+/// 播放速度选项（1.0 = 正常）
+class PlaybackSpeedNotifier extends Notifier<double> {
+  @override
+  double build() => 1.0;
+
+  void set(double speed) => state = speed;
+}
+
+final playbackSpeedProvider =
+    NotifierProvider<PlaybackSpeedNotifier, double>(
+  PlaybackSpeedNotifier.new,
+);
 
 /// 播放状态枚举
 enum PlayerState {
@@ -98,6 +112,20 @@ class PlayerController extends Notifier<PlayerState> {
     }
   }
 
+  /// 当前播放速度（1.0 为正常速度）
+  double _playbackSpeed = 1.0;
+  double get playbackSpeed => _playbackSpeed;
+
+  /// 设置播放速度
+  Future<void> setPlaybackSpeed(double speed) async {
+    _playbackSpeed = speed;
+    try {
+      await ref.read(audioPlayerServiceProvider).setSpeed(speed);
+    } catch (_) {
+      // 设置速度失败不影响当前播放状态
+    }
+  }
+
   Future<void> play() async {
     try {
       await ref.read(audioPlayerServiceProvider).play();
@@ -190,6 +218,8 @@ class PlayerController extends Notifier<PlayerState> {
     switch (playbackState) {
       case PlaybackStateEnum.playing:
         state = PlayerState.playing;
+        // 自动记录最近播放
+        _tryRecordPlay();
         break;
       case PlaybackStateEnum.loading:
         state = PlayerState.loading;
@@ -203,6 +233,16 @@ class PlayerController extends Notifier<PlayerState> {
       case PlaybackStateEnum.error:
         state = PlayerState.error;
         break;
+    }
+  }
+
+  /// 记录最近播放
+  void _tryRecordPlay() {
+    if (_currentSong == null) return;
+    try {
+      ref.read(recentPlaysListProvider.notifier).recordPlay(_currentSong!);
+    } catch (_) {
+      // 记录失败不影响播放
     }
   }
 
