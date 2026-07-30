@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/library/song_item.dart';
 import '../../services/player/audio_player_service.dart';
 import '../../services/auth/auth_repository.dart';
+import '../../services/library/recent_plays_repository.dart';
 
 /// 播放速度选项（1.0 = 正常）
 class PlaybackSpeedNotifier extends Notifier<double> {
@@ -217,6 +218,8 @@ class PlayerController extends Notifier<PlayerState> {
     switch (playbackState) {
       case PlaybackStateEnum.playing:
         state = PlayerState.playing;
+        // 自动记录最近播放
+        _tryRecordPlay();
         break;
       case PlaybackStateEnum.loading:
         state = PlayerState.loading;
@@ -230,6 +233,16 @@ class PlayerController extends Notifier<PlayerState> {
       case PlaybackStateEnum.error:
         state = PlayerState.error;
         break;
+    }
+  }
+
+  /// 记录最近播放
+  void _tryRecordPlay() {
+    if (_currentSong == null) return;
+    try {
+      ref.read(recentPlaysListProvider.notifier).recordPlay(_currentSong!);
+    } catch (_) {
+      // 记录失败不影响播放
     }
   }
 

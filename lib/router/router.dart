@@ -11,6 +11,7 @@ import '../pages/home/album_detail_page.dart';
 import '../pages/home/favorites_page.dart';
 import '../pages/home/search_page.dart';
 import '../pages/home/folders_page.dart';
+import '../pages/home/recent_plays_page.dart';
 import '../pages/player/player_page.dart';
 import '../models/library/album.dart';
 import '../services/auth/auth_repository.dart';
@@ -100,6 +101,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           }
           return const FoldersPage();
         },
+      ),
+      GoRoute(
+        path: RecentPlaysPage.routePath,
+        name: RecentPlaysPage.routeName,
+        builder: (context, state) => const RecentPlaysPage(),
       ),
     ],
   );

@@ -15,6 +15,7 @@ import 'search_page.dart';
 import 'artists_page.dart';
 import 'albums_page.dart';
 import 'folders_page.dart';
+import 'recent_plays_page.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -161,6 +162,16 @@ class HomePage extends ConsumerWidget {
                           color: Colors.pink,
                           onTap: () {
                             context.push('/favorites');
+                          },
+                        ),
+                        const SizedBox(height: 10),
+                        _PlaylistCard(
+                          icon: Icons.history_rounded,
+                          title: '最近播放',
+                          subtitle: '播放历史记录',
+                          color: Colors.blueGrey,
+                          onTap: () {
+                            context.push(RecentPlaysPage.routePath);
                           },
                         ),
 
