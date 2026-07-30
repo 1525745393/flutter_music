@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'router/router.dart';
 import 'services/auth/auth_repository.dart';
+import 'services/theme/theme_provider.dart';
 
 class MusicApp extends ConsumerWidget {
   const MusicApp({super.key});
@@ -11,6 +12,7 @@ class MusicApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
+    final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp.router(
       title: 'Synology Music Player',
@@ -26,6 +28,7 @@ class MusicApp extends ConsumerWidget {
         ),
         useMaterial3: true,
       ),
+      themeMode: themeMode,
       routerConfig: router,
     );
   }
@@ -47,6 +50,11 @@ void main() async {
   final container = ProviderContainer();
   try {
     await container.read(authRepositoryProvider).loadSession();
+  } catch (_) {}
+
+  // 加载主题偏好
+  try {
+    await container.read(themeModeProvider.notifier).load();
   } catch (_) {}
 
   runApp(

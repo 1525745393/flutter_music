@@ -3,6 +3,19 @@ import '../../models/library/song_item.dart';
 import '../../services/player/audio_player_service.dart';
 import '../../services/auth/auth_repository.dart';
 
+/// 播放速度选项（1.0 = 正常）
+class PlaybackSpeedNotifier extends Notifier<double> {
+  @override
+  double build() => 1.0;
+
+  void set(double speed) => state = speed;
+}
+
+final playbackSpeedProvider =
+    NotifierProvider<PlaybackSpeedNotifier, double>(
+  PlaybackSpeedNotifier.new,
+);
+
 /// 播放状态枚举
 enum PlayerState {
   idle,      // 空闲状态
@@ -95,6 +108,20 @@ class PlayerController extends Notifier<PlayerState> {
       }
       await service.loadSong(_playQueue[startIndex].id);
       _errorMessage = null;
+    }
+  }
+
+  /// 当前播放速度（1.0 为正常速度）
+  double _playbackSpeed = 1.0;
+  double get playbackSpeed => _playbackSpeed;
+
+  /// 设置播放速度
+  Future<void> setPlaybackSpeed(double speed) async {
+    _playbackSpeed = speed;
+    try {
+      await ref.read(audioPlayerServiceProvider).setSpeed(speed);
+    } catch (_) {
+      // 设置速度失败不影响当前播放状态
     }
   }
 

@@ -50,6 +50,22 @@ class LibraryPage extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('音乐库'),
         actions: [
+          PopupMenuButton<_SortOption>(
+            icon: const Icon(Icons.sort_rounded),
+            tooltip: '排序',
+            onSelected: (option) {
+              ref.read(songSortByProvider.notifier).set(option.sortBy);
+              ref.read(songSortDirectionProvider.notifier)
+                  .set(option.sortDirection);
+              ref.invalidate(songsProvider);
+            },
+            itemBuilder: (context) => _sortOptions
+                .map((opt) => PopupMenuItem<_SortOption>(
+                      value: opt,
+                      child: Text(opt.label),
+                    ))
+                .toList(),
+          ),
           IconButton(
             onPressed: () async {
               await ref.read(authRepositoryProvider).clearSession();
@@ -183,3 +199,23 @@ class LibraryPage extends ConsumerWidget {
     );
   }
 }
+
+/// 排序选项
+class _SortOption {
+  const _SortOption({required this.label, required this.sortBy, required this.sortDirection});
+  final String label;
+  final String? sortBy;
+  final String? sortDirection;
+}
+
+const _sortOptions = [
+  _SortOption(label: '默认排序', sortBy: null, sortDirection: null),
+  _SortOption(label: '标题 A-Z', sortBy: 'title', sortDirection: 'ASC'),
+  _SortOption(label: '标题 Z-A', sortBy: 'title', sortDirection: 'DESC'),
+  _SortOption(label: '艺术家 A-Z', sortBy: 'artist', sortDirection: 'ASC'),
+  _SortOption(label: '专辑 A-Z', sortBy: 'album', sortDirection: 'ASC'),
+  _SortOption(label: '年份 新-旧', sortBy: 'year', sortDirection: 'DESC'),
+  _SortOption(label: '时长 长-短', sortBy: 'duration', sortDirection: 'DESC'),
+  _SortOption(label: '评分 高-低', sortBy: 'rating', sortDirection: 'DESC'),
+  _SortOption(label: '随机', sortBy: 'random', sortDirection: 'ASC'),
+];

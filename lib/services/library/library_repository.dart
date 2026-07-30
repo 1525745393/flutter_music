@@ -7,6 +7,7 @@ import '../../models/library/song_item.dart';
 import '../../models/library/lyrics.dart';
 import '../../models/library/artist.dart';
 import '../../models/library/album.dart';
+import '../../models/library/folder_item.dart';
 
 /// 音乐库异常类
 class LibraryException implements Exception {
@@ -89,9 +90,18 @@ class LibraryRepository {
     }
   }
 
-  Future<List<SongItem>> fetchSongs({int limit = 100}) async {
+  Future<List<SongItem>> fetchSongs({
+    int limit = 100,
+    String? sortBy,
+    String? sortDirection,
+  }) async {
     return _execute(
-      apiCall: (api, sid) => api.listSongs(sid: sid, limit: limit),
+      apiCall: (api, sid) => api.listSongs(
+        sid: sid,
+        limit: limit,
+        sortBy: sortBy,
+        sortDirection: sortDirection,
+      ),
       onSuccess: (body, api, sid) {
         final songs =
             (body['data'] as Map<String, dynamic>?)?['songs'] as List<dynamic>? ??
@@ -223,6 +233,22 @@ class LibraryRepository {
         return LyricsParser.parseLrc(lyricsText);
       },
       errorPrefix: '歌词请求失败',
+    );
+  }
+
+  /// 获取文件夹列表
+  Future<List<FolderItem>> fetchFolders({String? id}) async {
+    return _execute(
+      apiCall: (api, sid) => api.listFolders(sid: sid, id: id),
+      onSuccess: (body, api, sid) {
+        final data = body['data'] as Map<String, dynamic>?;
+        final foldersList = data?['folders'] as List<dynamic>? ?? [];
+        return foldersList
+            .whereType<Map<String, dynamic>>()
+            .map(FolderItem.fromMap)
+            .toList(growable: false);
+      },
+      errorPrefix: '文件夹请求失败',
     );
   }
 
