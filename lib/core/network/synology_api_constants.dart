@@ -9,15 +9,15 @@ class SynologyApiConstants {
   static const sidKey = '_sid';
 
   // API Info（用于查询所有 API 的元信息）
-  // 官方文档：路径固定为 /webapi/entry.cgi
-  static const apiInfoPath = '/webapi/entry.cgi';
+  // 官方文档：路径固定为 /webapi/query.cgi（DSM 6/7 均支持）
+  static const apiInfoPath = '/webapi/query.cgi';
   static const apiInfoApiName = 'SYNO.API.Info';
   static const apiInfoVersion = '1';
 
   // Auth API
-  // 注意：DSM 7+ 的 Auth API 路径是 entry.cgi，不是 auth.cgi
-  // 参考 AudioStation 接口文档：SYNO.API.Auth 的 path 为 entry.cgi
-  static const authPath = '/webapi/entry.cgi';
+  // 路径随 DSM 版本变化：DSM 6.x 为 /webapi/auth.cgi，DSM 7.x 为 /webapi/entry.cgi
+  // 登录前会先查询 SYNO.API.Info 获取真实路径，此处为 DSM 6 的 fallback
+  static const authPath = '/webapi/auth.cgi';
   static const authApiName = 'SYNO.API.Auth';
   static const authVersion = '6';
   // session 值为小写 audiostation（官方文档明确）

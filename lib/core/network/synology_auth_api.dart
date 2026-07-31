@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 
 import 'synology_api_constants.dart';
 import 'synology_base_api.dart';
+import 'synology_api_exception.dart';
 
 /// 群晖认证 API 模块。
 ///
@@ -73,11 +74,17 @@ class SynologyAuthApi extends SynologyBaseApi {
     );
 
     // 依次尝试两种 POST 请求格式，任意一种成功即返回。
-    // 如果返回了有效 JSON（success=false），说明格式兼容但业务失败（如密码错误、需要2FA），
-    // 此时直接返回业务错误，不再 fallback，避免重复请求触发 IP 封禁。
+    // form-urlencoded 优先：DSM 6.x 的 auth.cgi 仅支持该格式；
+    // DSM 7.x 的 entry.cgi 同时支持 JSON 与 form-urlencoded。
+    //
+    // 对 success=false 的响应区分处理：
+    // - 参数错误（错误码 101）：说明服务器未接受该 content-type 编码，
+    //   尝试下一种格式，避免 DSM 6 因 JSON body 被拒而登录失败。
+    // - 其他业务错误（401 密码错误、403 需要 2FA 等）：直接返回，
+    //   不再 fallback，避免重复请求触发 IP 封禁。
     final attempts = <(dynamic, String)>[
-      (jsonEncode(paramsIntVersion), 'application/json'),
       (paramsStringVersion, 'application/x-www-form-urlencoded'),
+      (jsonEncode(paramsIntVersion), 'application/json'),
     ];
 
     dynamic lastError;
@@ -93,7 +100,17 @@ class SynologyAuthApi extends SynologyBaseApi {
         if (body['success'] == true) {
           return body;
         }
-        // 有效 JSON 且 success=false：格式兼容，业务失败，直接返回
+        // 仅当错误码表示参数/格式问题（101）时，尝试下一种格式
+        final errorCode =
+            (body['error'] as Map<String, dynamic>?)?['code'] as int?;
+        if (errorCode == 101) {
+          lastError = SynologyApiException(
+            '参数错误（错误码 101）',
+            errorCode: errorCode,
+          );
+          continue;
+        }
+        // 有效 JSON 且 success=false：业务失败，直接返回
         return body;
       } catch (e) {
         // 仅网络错误或响应无法解析时，记录错误并尝试下一种格式
