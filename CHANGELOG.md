@@ -1,3 +1,10 @@
+## [1.9.1](https://github.com/1525745393/flutter_music/compare/v1.9.0...v1.9.1) (2026-07-31)
+
+
+### Bug Fixes
+
+* 修复群晖直连登录失败问题 ([9784b83](https://github.com/1525745393/flutter_music/commit/9784b83d0caf3f052e1c9bb4e12e00e911162ca5))
+
 # [1.9.0](https://github.com/1525745393/flutter_music/compare/v1.8.0...v1.9.0) (2026-07-30)
 
 
