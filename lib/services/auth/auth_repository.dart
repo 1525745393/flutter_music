@@ -253,7 +253,20 @@ class AuthRepository {
     required String password,
     String? deviceId,
   }) async {
-    final api = SynologyAuthApi(serverUrl: serverUrl);
+    // 登录前先查询 SYNO.API.Info，获取正确的 Auth 路径与版本。
+    // DSM 6.x 的 Auth 路径为 /webapi/auth.cgi，DSM 7.x 为 /webapi/entry.cgi，
+    // 仅靠硬编码 fallback 无法同时兼容两个大版本。
+    SynologyApiInfo? apiInfo;
+    try {
+      apiInfo = SynologyApiInfo(serverUrl: serverUrl);
+      await apiInfo.load(queryApis: [SynologyApiConstants.authApiName]);
+      // 加载成功后同时缓存，供后续音乐库请求复用
+      _apiInfo = apiInfo;
+    } catch (_) {
+      // 查询失败时使用硬编码 fallback（DSM 6 的 auth.cgi）
+    }
+
+    final api = SynologyAuthApi(serverUrl: serverUrl, apiInfo: apiInfo);
     try {
       return await api.login(
         username: username,
@@ -322,7 +335,7 @@ class AuthRepository {
 
     for (final url in candidateUrls) {
       try {
-        final api = SynologyAuthApi(serverUrl: url);
+        final api = SynologyAuthApi(serverUrl: url, apiInfo: _apiInfo);
         final data = await api.loginWithOtp(
           username: username,
           password: password,
