@@ -483,7 +483,13 @@ class _NasSearchPageState extends ConsumerState<NasSearchPage> {
                               subtitle: Text(
                                 '${song.artist} · ${song.album}',
                               ),
-                              trailing: NasFavoriteButton(song: song),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  NasAddToPlaylistButton(song: song),
+                                  NasFavoriteButton(song: song),
+                                ],
+                              ),
                               onTap: () async {
                                 await playNasQueue(
                                   ref,

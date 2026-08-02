@@ -81,7 +81,13 @@ class NasAlbumSongsPage extends ConsumerWidget {
                 leading: nasCoverBox(url: album.coverUrl, icon: Icons.album),
                 title: Text(song.title),
                 subtitle: Text(song.artist),
-                trailing: NasFavoriteButton(song: song),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    NasAddToPlaylistButton(song: song),
+                    NasFavoriteButton(song: song),
+                  ],
+                ),
                 onTap: () async {
                   await playNasQueue(ref, items, startIndex: index);
                   if (context.mounted) {
