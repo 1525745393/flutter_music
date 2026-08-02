@@ -13,6 +13,8 @@ class SynologyAudioStationApi extends SynologyBaseApi {
     required super.serverUrl,
     super.apiInfo,
     super.synoToken,
+    super.interceptors,
+    super.ignoreSelfSignedCert,
   });
 
   // ========== Song 歌曲 ==========

@@ -7,6 +7,7 @@ import '../../services/library/library_repository.dart';
 import '../../services/theme/theme_provider.dart';
 import '../../widgets/mini_player_bar.dart';
 import '../login/login_page.dart';
+import '../nas/nas_library_page.dart';
 import '../player/player_page.dart';
 import '../player/player_controller.dart';
 import 'library_providers.dart';
@@ -172,6 +173,16 @@ class HomePage extends ConsumerWidget {
                           color: Colors.blueGrey,
                           onTap: () {
                             context.push(RecentPlaysPage.routePath);
+                          },
+                        ),
+                        const SizedBox(height: 10),
+                        _PlaylistCard(
+                          icon: Icons.dns_rounded,
+                          title: 'NAS 音乐库',
+                          subtitle: '群晖 AudioStation 播放源',
+                          color: Colors.teal,
+                          onTap: () {
+                            context.push(NasLibraryPage.routePath);
                           },
                         ),
 
