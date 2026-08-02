@@ -110,6 +110,20 @@ class AudioPlayerService {
     }
   }
 
+  /// 直接加载完整音频 URL（供自定义播放源使用）
+  ///
+  /// 数据源（如 NAS 音乐库）构造好完整播放地址后调用，
+  /// 无需依赖 [AuthRepository] 的会话与服务器地址。
+  Future<void> loadUrl(String audioUrl) async {
+    await _ensureInitialized();
+    try {
+      await _audioPlayer.setUrl(audioUrl);
+    } catch (e) {
+      debugPrint('加载音频 URL 失败: $e');
+      rethrow;
+    }
+  }
+
   /// 获取歌曲 URL
   ///
   /// 使用智能选择：整轨文件（ID含_v_）自动转码，否则直接流播放

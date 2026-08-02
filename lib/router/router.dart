@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../pages/login/login_page.dart';
+import '../pages/nas/nas_config_page.dart';
+import '../pages/nas/nas_library_page.dart';
+import '../pages/nas/nas_artist_albums_page.dart';
 import '../pages/home/home_page.dart';
 import '../pages/home/library_page.dart';
 import '../pages/home/artists_page.dart';
@@ -14,6 +17,7 @@ import '../pages/home/folders_page.dart';
 import '../pages/home/recent_plays_page.dart';
 import '../pages/player/player_page.dart';
 import '../models/library/album.dart';
+import '../models/library/playlist.dart';
 import '../services/auth/auth_repository.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -106,6 +110,60 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: RecentPlaysPage.routePath,
         name: RecentPlaysPage.routeName,
         builder: (context, state) => const RecentPlaysPage(),
+      ),
+      GoRoute(
+        path: NasConfigPage.routePath,
+        name: NasConfigPage.routeName,
+        builder: (context, state) => const NasConfigPage(),
+      ),
+      GoRoute(
+        path: NasLibraryPage.routePath,
+        name: NasLibraryPage.routeName,
+        builder: (context, state) => const NasLibraryPage(),
+      ),
+      GoRoute(
+        path: NasSearchPage.routePath,
+        name: NasSearchPage.routeName,
+        builder: (context, state) => const NasSearchPage(),
+      ),
+      GoRoute(
+        path: NasPlaylistDetailPage.routePath,
+        name: NasPlaylistDetailPage.routeName,
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is Playlist) {
+            return NasPlaylistDetailPage(playlist: extra);
+          }
+          return const Scaffold(
+            body: Center(child: Text('无效的歌单信息')),
+          );
+        },
+      ),
+      GoRoute(
+        path: NasArtistAlbumsPage.routePath,
+        name: NasArtistAlbumsPage.routeName,
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is String && extra.isNotEmpty) {
+            return NasArtistAlbumsPage(artistName: extra);
+          }
+          return const Scaffold(
+            body: Center(child: Text('无效的歌手信息')),
+          );
+        },
+      ),
+      GoRoute(
+        path: NasAlbumSongsPage.routePath,
+        name: NasAlbumSongsPage.routeName,
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is Album) {
+            return NasAlbumSongsPage(album: extra);
+          }
+          return const Scaffold(
+            body: Center(child: Text('无效的专辑信息')),
+          );
+        },
       ),
     ],
   );

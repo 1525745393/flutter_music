@@ -5,7 +5,6 @@ import 'package:dio/dio.dart';
 import 'dio_client.dart';
 import 'synology_api_exception.dart';
 import 'synology_api_info.dart';
-
 /// 群晖 API 基类，负责：
 /// - 复用同一套 Dio 配置
 /// - 统一响应校验和错误处理
@@ -15,8 +14,14 @@ abstract class SynologyBaseApi {
     required String serverUrl,
     SynologyApiInfo? apiInfo,
     this.synoToken,
+    List<Interceptor>? interceptors,
+    bool ignoreSelfSignedCert = true,
   })  : serverUrl = _normalizeServerUrl(serverUrl),
-        dio = DioClient(baseUrl: _normalizeServerUrl(serverUrl)).dio,
+        dio = DioClient(
+          baseUrl: _normalizeServerUrl(serverUrl),
+          interceptors: interceptors,
+          ignoreSelfSignedCert: ignoreSelfSignedCert,
+        ).dio,
         _apiInfo = apiInfo;
 
   final String serverUrl;

@@ -92,6 +92,48 @@ class PlayerController extends Notifier<PlayerState> {
   /// 获取当前播放索引
   int get currentIndex => _currentIndex;
 
+  /// 播放源 URL 解析器（供自定义播放源注入）
+  ///
+  /// 为 null 时使用默认方式：按歌曲 ID 从群晖会话构造流地址。
+  /// 非空时（如 NAS 音乐库），用解析器生成完整 URL 交给播放器。
+  Future<String> Function(SongItem song)? _playbackUrlResolver;
+
+  /// 设置播放源 URL 解析器
+  void setPlaybackUrlResolver(Future<String> Function(SongItem song)? resolver) {
+    _playbackUrlResolver = resolver;
+  }
+
+  /// 用自定义播放源设置播放队列并开始播放
+  ///
+  /// [resolver] 由播放源实现（如 NAS 音乐库）提供，
+  /// 生成完整音频 URL 交给播放器。队列内歌曲的播放地址
+  /// 均在 [resolver] 内部构造，与默认群晖会话解耦。
+  Future<void> setPlayQueueWithResolver(
+    List<SongItem> queue, {
+    required Future<String> Function(SongItem song) resolver,
+    int startIndex = 0,
+  }) async {
+    _playbackUrlResolver = resolver;
+    await setPlayQueue(queue, startIndex: startIndex);
+  }
+
+  /// 按当前索引加载歌曲（统一入口，兼容默认/自定义播放源）
+  Future<void> _loadCurrentSong(SongItem song) async {
+    final service = ref.read(audioPlayerServiceProvider);
+    final resolver = _playbackUrlResolver;
+    if (resolver != null) {
+      final url = await resolver(song);
+      await service.loadUrl(url);
+    } else {
+      final authRepository = ref.read(authRepositoryProvider);
+      final session = await authRepository.loadSession();
+      if (session != null) {
+        service.setServerUrl(session.serverUrl);
+      }
+      await service.loadSong(song.id);
+    }
+  }
+
   /// 设置播放队列
   Future<void> setPlayQueue(List<SongItem> queue, {int startIndex = 0}) async {
     _playQueue = queue;
@@ -100,15 +142,13 @@ class PlayerController extends Notifier<PlayerState> {
     if (_playQueue.isNotEmpty && startIndex < _playQueue.length) {
       _currentSong = _playQueue[startIndex];
       state = PlayerState.loading;
-
-      final service = ref.read(audioPlayerServiceProvider);
-      final authRepository = ref.read(authRepositoryProvider);
-      final session = await authRepository.loadSession();
-      if (session != null) {
-        service.setServerUrl(session.serverUrl);
+      try {
+        await _loadCurrentSong(_currentSong!);
+        _errorMessage = null;
+      } catch (e) {
+        _errorMessage = e.toString();
+        state = PlayerState.error;
       }
-      await service.loadSong(_playQueue[startIndex].id);
-      _errorMessage = null;
     }
   }
 
@@ -170,7 +210,7 @@ class PlayerController extends Notifier<PlayerState> {
       _currentSong = _playQueue[_currentIndex];
       state = PlayerState.loading;
       try {
-        await ref.read(audioPlayerServiceProvider).loadSong(_currentSong!.id);
+        await _loadCurrentSong(_currentSong!);
         await ref.read(audioPlayerServiceProvider).play();
         _errorMessage = null;
         state = PlayerState.playing;
@@ -191,7 +231,7 @@ class PlayerController extends Notifier<PlayerState> {
       _currentSong = _playQueue[_currentIndex];
       state = PlayerState.loading;
       try {
-        await ref.read(audioPlayerServiceProvider).loadSong(_currentSong!.id);
+        await _loadCurrentSong(_currentSong!);
         await ref.read(audioPlayerServiceProvider).play();
         _errorMessage = null;
         state = PlayerState.playing;
