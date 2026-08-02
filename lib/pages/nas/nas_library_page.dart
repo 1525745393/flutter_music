@@ -361,27 +361,36 @@ class NasPlaylistDetailPage extends ConsumerWidget {
                 ),
                 title: Text(song.title),
                 subtitle: Text('${song.artist} · ${song.album}'),
-                trailing: IconButton(
-                  icon: const Icon(Icons.remove_circle_outline),
-                  tooltip: '从歌单移除',
-                  onPressed: () async {
-                    try {
-                      final repo = ref.read(synoMusicRepositoryProvider);
-                      await repo.removeSongFromPlaylist(playlist.id, song.id);
-                      ref.invalidate(nasPlaylistSongsProvider(playlist.id));
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('已从歌单移除')),
-                        );
-                      }
-                    } catch (e) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('移除失败：$e')),
-                        );
-                      }
-                    }
-                  },
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    NasAddToPlaylistButton(song: song),
+                    IconButton(
+                      icon: const Icon(Icons.remove_circle_outline),
+                      tooltip: '从歌单移除',
+                      onPressed: () async {
+                        try {
+                          final repo = ref.read(synoMusicRepositoryProvider);
+                          await repo.removeSongFromPlaylist(
+                            playlist.id,
+                            song.id,
+                          );
+                          ref.invalidate(nasPlaylistSongsProvider(playlist.id));
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('已从歌单移除')),
+                            );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('移除失败：$e')),
+                            );
+                          }
+                        }
+                      },
+                    ),
+                  ],
                 ),
                 onTap: () async {
                   await playNasQueue(ref, items, startIndex: index);
