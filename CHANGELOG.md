@@ -1,3 +1,12 @@
+# [1.10.0](https://github.com/1525745393/flutter_music/compare/v1.9.1...v1.10.0) (2026-08-02)
+
+
+### Features
+
+* NAS 播放源扩展模块（群晖 AudioStation） ([8e7ba64](https://github.com/1525745393/flutter_music/commit/8e7ba648db27253cbf807c4a553aa3d7b8427f97))
+* NAS 歌曲添加到歌单入口 ([6972ca0](https://github.com/1525745393/flutter_music/commit/6972ca0c75c3d83d3b68386f8391e44976fbb4c9))
+* 歌单详情页歌曲支持添加到其他歌单 ([4ba09ac](https://github.com/1525745393/flutter_music/commit/4ba09ac42967bf7f9ddce6a41a57f2028d1b6c4f))
+
 ## [1.9.1](https://github.com/1525745393/flutter_music/compare/v1.9.0...v1.9.1) (2026-07-31)
 
 
