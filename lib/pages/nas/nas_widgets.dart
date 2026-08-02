@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/library/playlist.dart';
 import '../../models/library/song_item.dart';
 import '../../syno/syno_providers.dart';
-import 'nas_providers.dart';/// NAS 封面占位组件
+import 'nas_providers.dart';
+
+/// NAS 封面占位组件
 Widget nasCoverBox({required String? url, required IconData icon}) {
   if (url == null || url.isEmpty) {
     return SizedBox(

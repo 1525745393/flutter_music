@@ -24,12 +24,14 @@ class DioClient {
         dio.httpClientAdapter = IOHttpClientAdapter(
           createHttpClient: () {
             final client = HttpClient();
-            // 放行所有 SSL 证书校验 — 权衡安全与可用性的设计决策。
-            // 群晖 QuickConnect 场景下，NAS 通常使用自签名证书或 QuickConnect relay
-            // 服务器的动态域名，证书校验会因为域名不匹配而失败。
-            // 如果不放行，自签名证书和 relay 连接都会直接断开。
+            // 放行自签名/未知 CA 证书，但始终校验证书主机名与访问 host 一致，
+            // 避免忽略自签名开关被滥用为 MITM 通道。
             client.badCertificateCallback =
-                (X509Certificate cert, String host, int port) => true;
+                (X509Certificate cert, String host, int port) {
+              final certHosts = _certificateHosts(cert);
+              if (certHosts.isEmpty) return false;
+              return certHosts.any((name) => _hostMatches(name, host));
+            };
             return client;
           },
         );
@@ -40,4 +42,35 @@ class DioClient {
     }
 
   final Dio dio;
+
+  /// 提取证书中可用于主机名校验的主机名（从 subject 解析 CN）
+  static Set<String> _certificateHosts(X509Certificate cert) {
+    final hosts = <String>{};
+    try {
+      final subject = cert.subject;
+      final cn = subject
+          .split(',')
+          .map((part) => part.trim())
+          .where((part) => part.startsWith('CN='))
+          .map((part) => part.substring(3).trim())
+          .where((name) => name.isNotEmpty)
+          .firstOrNull;
+      if (cn != null) hosts.add(cn);
+    } catch (_) {
+      // 证书字段解析失败时，退回严格校验（不匹配任何 host）
+    }
+    return hosts;
+  }
+
+  /// 判断证书主机名是否匹配访问 host，支持通配符 `*.example.com`
+  static bool _hostMatches(String certName, String host) {
+    final name = certName.toLowerCase();
+    final target = host.toLowerCase();
+    if (name == target) return true;
+    if (name.startsWith('*.')) {
+      final suffix = name.substring(1);
+      return target.endsWith(suffix);
+    }
+    return false;
+  }
 }

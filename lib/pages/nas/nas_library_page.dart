@@ -33,11 +33,11 @@ class _NasLibraryPageState extends ConsumerState<NasLibraryPage> {
       final repo = ref.read(synoMusicRepositoryProvider);
       if (repo.isConnected) return;
       try {
-        await repo.connect();
+        await repo.connect().timeout(const Duration(seconds: 15));
       } catch (_) {
         // 未登录或会话失效，引导到配置页
       }
-      if (!mounted) return;
+      if (!mounted || !context.mounted) return;
       if (!repo.isConnected) {
         context.go(NasConfigPage.routePath);
       }
@@ -167,22 +167,12 @@ class _FavoritesTab extends ConsumerWidget {
             ),
             title: Text(song.title),
             subtitle: Text('${song.artist} · ${song.album}'),
-            trailing: IconButton(
-              icon: const Icon(Icons.favorite, color: Colors.red),
-              tooltip: '取消收藏',
-              onPressed: () async {
-                try {
-                  final repo = ref.read(synoMusicRepositoryProvider);
-                  await repo.removeFavorite(song.songId);
-                  ref.invalidate(nasFavoritesProvider);
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('取消收藏失败：$e')),
-                    );
-                  }
-                }
-              },
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                NasAddToPlaylistButton(song: song.toSongItem()),
+                NasFavoriteButton(song: song.toSongItem()),
+              ],
             ),
             onTap: () async {
               final queue = items.map((f) => f.toSongItem()).toList();
