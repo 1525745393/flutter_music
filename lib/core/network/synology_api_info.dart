@@ -105,10 +105,10 @@ class SynologyApiInfo extends SynologyBaseApi {
   String getApiPath(String apiName, String fallbackPath) {
     final meta = _cache[apiName];
     if (meta == null || meta.path.isEmpty) return fallbackPath;
-    // API Info 返回的 path 不带 /webapi/ 前缀，需要补上
-    if (meta.path.startsWith('/')) {
-      return '/webapi${meta.path}';
-    }
+    // API Info 返回的 path 不带 /webapi/ 前缀，需要补上；
+    // 兼容个别固件已返回完整路径的情况，避免重复前缀。
+    if (meta.path.startsWith('/webapi/')) return meta.path;
+    if (meta.path.startsWith('/')) return '/webapi${meta.path}';
     return '/webapi/${meta.path}';
   }
 }

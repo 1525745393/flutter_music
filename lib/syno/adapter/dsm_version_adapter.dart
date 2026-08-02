@@ -30,22 +30,6 @@ class DsmVersionAdapter {
     return path.contains('entry.cgi');
   }
 
-  /// 认证接口推荐版本
-  String get authVersion => apiInfo?.isLoaded == true
-      ? '${apiInfo!.getApiVersion(
-          SynologyApiConstants.authApiName,
-          int.parse(SynologyApiConstants.authVersion),
-        )}'
-      : SynologyApiConstants.authVersion;
-
-  /// 当前采用的认证路径
-  String get authPath => apiInfo?.isLoaded == true
-      ? apiInfo!.getApiPath(
-          SynologyApiConstants.authApiName,
-          SynologyApiConstants.authPath,
-        )
-      : SynologyApiConstants.authPath;
-
   /// 是否需要在请求中携带 SynoToken（DSM 7 推荐，DSM 6 可忽略）
   bool get shouldSendSynoToken => isDsm7;
 }

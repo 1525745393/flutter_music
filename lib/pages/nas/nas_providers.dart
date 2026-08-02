@@ -9,48 +9,50 @@ import '../../syno/syno_providers.dart';
 import '../player/player_controller.dart';
 
 /// NAS 音乐库数据 Provider（直接依赖群晖实现）
-final nasSongsProvider = FutureProvider<List<SongItem>>((ref) {
+final nasSongsProvider = FutureProvider.autoDispose<List<SongItem>>((ref) {
   final repo = ref.watch(synoMusicRepositoryProvider);
   return repo.fetchSongs();
 });
 
-final nasAlbumsProvider = FutureProvider<List<Album>>((ref) {
+final nasAlbumsProvider = FutureProvider.autoDispose<List<Album>>((ref) {
   final repo = ref.watch(synoMusicRepositoryProvider);
   return repo.fetchAlbums();
 });
 
-final nasArtistsProvider = FutureProvider<List<Artist>>((ref) {
+final nasArtistsProvider = FutureProvider.autoDispose<List<Artist>>((ref) {
   final repo = ref.watch(synoMusicRepositoryProvider);
   return repo.fetchArtists();
 });
 
 /// 某歌手的专辑列表
 final nasArtistAlbumsProvider =
-    FutureProvider.family<List<Album>, String>((ref, artistName) {
+    FutureProvider.autoDispose.family<List<Album>, String>((ref, artistName) {
   final repo = ref.watch(synoMusicRepositoryProvider);
   return repo.fetchAlbums(artistName: artistName);
 });
 
 /// 某专辑的歌曲列表
 final nasAlbumSongsProvider =
-    FutureProvider.family<List<SongItem>, Album>((ref, album) {
+    FutureProvider.autoDispose.family<List<SongItem>, Album>((ref, album) {
   final repo = ref.watch(synoMusicRepositoryProvider);
   return repo.fetchAlbumSongs(album);
 });
 
-final nasFavoritesProvider = FutureProvider<List<FavoriteSong>>((ref) {
+final nasFavoritesProvider =
+    FutureProvider.autoDispose<List<FavoriteSong>>((ref) {
   final repo = ref.watch(synoMusicRepositoryProvider);
   return repo.fetchFavorites();
 });
 
-final nasPlaylistsProvider = FutureProvider<List<Playlist>>((ref) {
+final nasPlaylistsProvider =
+    FutureProvider.autoDispose<List<Playlist>>((ref) {
   final repo = ref.watch(synoMusicRepositoryProvider);
   return repo.fetchPlaylists();
 });
 
 /// 某歌单内的歌曲
 final nasPlaylistSongsProvider =
-    FutureProvider.family<List<SongItem>, String>((ref, playlistId) {
+    FutureProvider.autoDispose.family<List<SongItem>, String>((ref, playlistId) {
   final repo = ref.watch(synoMusicRepositoryProvider);
   return repo.fetchPlaylistSongs(playlistId);
 });

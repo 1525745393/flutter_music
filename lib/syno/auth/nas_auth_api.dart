@@ -1,3 +1,7 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
+
 import '../../core/network/synology_api.dart';
 import '../config/nas_config.dart';
 import '../config/nas_config_store.dart';
@@ -34,6 +38,26 @@ class NasAuthApi {
   String? _cachedUsername;
   String? _cachedPassword;
 
+  /// 会话刷新回调（重登成功后触发，供仓库重建 API 实例）
+  VoidCallback? _onSessionRefreshed;
+
+  /// 注册会话刷新回调
+  void setOnSessionRefreshed(VoidCallback? callback) {
+    _onSessionRefreshed = callback;
+  }
+
+  /// 需要查询的 API 清单（版本自适应）
+  static const _requiredApis = [
+    SynologyApiConstants.authApiName,
+    SynologyApiConstants.songApiName,
+    SynologyApiConstants.albumApiName,
+    SynologyApiConstants.artistApiName,
+    SynologyApiConstants.playlistApiName,
+    SynologyApiConstants.searchApiName,
+    SynologyApiConstants.streamApiName,
+    SynologyApiConstants.coverApiName,
+  ];
+
   /// 当前会话
   NasSession? get session => _session;
 
@@ -43,6 +67,7 @@ class NasAuthApi {
   /// 恢复持久化的会话（启动时调用）
   ///
   /// 返回恢复是否成功；无会话或会话为空视为未登录。
+  /// 恢复成功后后台补拉 API Info，避免 DSM7 版本适配失效。
   Future<bool> restoreSession() async {
     final sid = await _store.loadSessionId();
     if (sid == null || sid.isEmpty) {
@@ -50,6 +75,7 @@ class NasAuthApi {
       return false;
     }
     _session = NasSession(sid: sid);
+    unawaited(_refreshApiInfoIfNeeded());
     return true;
   }
 
@@ -67,22 +93,7 @@ class NasAuthApi {
     final serverUrl = config.fullServerUrl;
 
     // 查询 API Info（DSM 6/7 版本自适应），失败时用硬编码 fallback
-    SynologyApiInfo? apiInfo;
-    try {
-      apiInfo = SynologyApiInfo(serverUrl: serverUrl);
-      await apiInfo.load(queryApis: [
-        SynologyApiConstants.authApiName,
-        SynologyApiConstants.songApiName,
-        SynologyApiConstants.albumApiName,
-        SynologyApiConstants.artistApiName,
-        SynologyApiConstants.playlistApiName,
-        SynologyApiConstants.searchApiName,
-        SynologyApiConstants.streamApiName,
-        SynologyApiConstants.coverApiName,
-      ]);
-    } catch (_) {
-      apiInfo = null;
-    }
+    final apiInfo = await _loadApiInfo(serverUrl);
 
     final api = SynologyAuthApi(serverUrl: serverUrl, apiInfo: apiInfo);
     try {
@@ -110,7 +121,8 @@ class NasAuthApi {
     required String otpCode,
   }) async {
     final serverUrl = config.fullServerUrl;
-    final api = SynologyAuthApi(serverUrl: serverUrl);
+    final apiInfo = await _loadApiInfo(serverUrl);
+    final api = SynologyAuthApi(serverUrl: serverUrl, apiInfo: apiInfo);
     try {
       final data = await api.loginWithOtp(
         username: config.username,
@@ -141,6 +153,7 @@ class NasAuthApi {
       final data = await api.login(username: username, password: password);
       if (data['success'] != true) return false;
       await _saveSessionFromLogin(serverUrl, data);
+      _onSessionRefreshed?.call();
       return true;
     } catch (_) {
       return false;
@@ -162,6 +175,29 @@ class NasAuthApi {
     await _store.clear();
   }
 
+  /// 查询 API Info，失败时返回 null（走硬编码 fallback）
+  Future<SynologyApiInfo?> _loadApiInfo(String serverUrl) async {
+    try {
+      final info = SynologyApiInfo(serverUrl: serverUrl);
+      await info.load(queryApis: _requiredApis);
+      return info;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 若当前会话缺少 apiInfo，后台补拉并更新会话
+  Future<void> _refreshApiInfoIfNeeded() async {
+    final session = _session;
+    if (session == null || session.apiInfo != null) return;
+    final config = await _store.loadConfig();
+    if (config == null) return;
+    final info = await _loadApiInfo(config.fullServerUrl);
+    if (info == null) return;
+    _session = session.copyWith(apiInfo: info);
+    _onSessionRefreshed?.call();
+  }
+
   /// 保存登录成功后的会话并持久化
   Future<void> _saveSessionFromLogin(
     String serverUrl,
@@ -176,26 +212,11 @@ class NasAuthApi {
     final synoToken = body?['synotoken'] as String?;
 
     // 保存新的 API Info 缓存（用于版本自适应）
-    SynologyApiInfo? apiInfo;
-    try {
-      final info = SynologyApiInfo(serverUrl: serverUrl);
-      await info.load(queryApis: [
-        SynologyApiConstants.authApiName,
-        SynologyApiConstants.songApiName,
-        SynologyApiConstants.albumApiName,
-        SynologyApiConstants.artistApiName,
-        SynologyApiConstants.playlistApiName,
-        SynologyApiConstants.searchApiName,
-        SynologyApiConstants.streamApiName,
-        SynologyApiConstants.coverApiName,
-      ]);
-      apiInfo = info;
-    } catch (_) {
-      apiInfo = null;
-    }
+    final apiInfo = await _loadApiInfo(serverUrl);
 
     _session = NasSession(sid: sid, synoToken: synoToken, apiInfo: apiInfo);
     await _store.saveSessionId(sid);
+    _onSessionRefreshed?.call();
   }
 
   /// 登录错误码映射

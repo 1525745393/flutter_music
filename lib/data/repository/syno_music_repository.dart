@@ -23,7 +23,11 @@ class SynoMusicRepository implements MusicSourceRepository {
   SynoMusicRepository({
     required this.configStore,
     required NasAuthApi authApi,
-  }) : _authApi = authApi;
+  }) : _authApi = authApi {
+    // 会话刷新（重登 / apiInfo 补拉）后，缓存 API 实例可能持有旧
+    // synoToken / apiInfo，需要重置以便按新会话重建。
+    _authApi.setOnSessionRefreshed(() => _api = null);
+  }
 
   final NasConfigStore configStore;
   final NasAuthApi _authApi;
@@ -98,12 +102,6 @@ class SynoMusicRepository implements MusicSourceRepository {
       return existing;
     }
 
-    final interceptor = AuthInterceptor(
-      authApi: _authApi,
-      configProvider: () => _config ?? config,
-      dioProvider: () => _api!.dio,
-    );
-
     // DSM 7 需要携带 SynoToken，DSM 6 可忽略（版本自适应）
     final adapter = _versionAdapter;
     final synoToken = adapter.shouldSendSynoToken ? session.synoToken : null;
@@ -112,8 +110,15 @@ class SynoMusicRepository implements MusicSourceRepository {
       serverUrl: config.fullServerUrl,
       apiInfo: session.apiInfo,
       synoToken: synoToken,
-      interceptors: [interceptor],
       ignoreSelfSignedCert: config.ignoreSelfSignedCert,
+    );
+    // 拦截器按需追加，dioProvider 引用已构造完成的 api，避免前向引用
+    api.dio.interceptors.add(
+      AuthInterceptor(
+        authApi: _authApi,
+        configProvider: () => _config ?? config,
+        dioProvider: () => api.dio,
+      ),
     );
     _api = api;
     return api;
@@ -135,6 +140,27 @@ class SynoMusicRepository implements MusicSourceRepository {
     final session = _requireSession();
     final api = _requireApi();
     final sid = session.sid;
+    final body = await _callApi(
+      apiCall: (api, sid) => apiCall(api, sid),
+      errorPrefix: errorPrefix,
+    );
+    return onSuccess(body, api, sid);
+  }
+
+  /// 仅执行 API 调用并校验 success / 网络异常，不做解析。
+  ///
+  /// 由 [connect] 之外的正常业务请求使用，供 [_execute] 与
+  /// [_fetchAllPages] 复用，保证错误处理一致。
+  Future<Map<String, dynamic>> _callApi({
+    required Future<Map<String, dynamic>> Function(
+      SynologyAudioStationApi api,
+      String sid,
+    ) apiCall,
+    String? errorPrefix,
+  }) async {
+    final session = _requireSession();
+    final api = _requireApi();
+    final sid = session.sid;
     try {
       final body = await apiCall(api, sid);
       if (body['success'] != true) {
@@ -142,7 +168,7 @@ class SynoMusicRepository implements MusicSourceRepository {
           '${errorPrefix ?? '请求失败'}：${_mapError(body)}',
         );
       }
-      return onSuccess(body, api, sid);
+      return body;
     } on DioException catch (e) {
       throw MusicSourceConnectionException(
         '${errorPrefix ?? '请求失败'}：网络异常（${e.type.name}）',
@@ -156,32 +182,71 @@ class SynoMusicRepository implements MusicSourceRepository {
 
   // ---------- 音乐库浏览 ----------
 
+  /// 分页拉取工具：循环请求直到拿满全部数据。
+  ///
+  /// [apiCall] 需接收 offset，[parse] 从单页 body 解析出该页元素。
+  /// 返回空页或不足一页时停止。
+  Future<List<T>> _fetchAllPages<T>({
+    required Future<Map<String, dynamic>> Function(
+      SynologyAudioStationApi api,
+      String sid,
+      int offset,
+    ) apiCall,
+    required List<T> Function(
+      Map<String, dynamic> body,
+      SynologyAudioStationApi api,
+      String sid,
+    ) parse,
+    int pageSize = 500,
+    String? errorPrefix,
+  }) async {
+    final session = _requireSession();
+    final api = _requireApi();
+    final sid = session.sid;
+    final result = <T>[];
+    var offset = 0;
+    while (true) {
+      final body = await _callApi(
+        apiCall: (api, sid) => apiCall(api, sid, offset),
+        errorPrefix: errorPrefix,
+      );
+      final page = parse(body, api, sid);
+      result.addAll(page);
+      if (page.length < pageSize) break;
+      offset += pageSize;
+    }
+    return result;
+  }
+
   @override
   Future<List<SongItem>> fetchSongs({
     String? sortBy,
     String? sortDirection,
   }) {
-    return _execute(
-      apiCall: (api, sid) => api.listSongs(
+    return _fetchAllPages(
+      errorPrefix: '歌曲列表请求失败',
+      apiCall: (api, sid, offset) => api.listSongs(
         sid: sid,
+        offset: offset,
         limit: 500,
         sortBy: sortBy,
         sortDirection: sortDirection,
       ),
-      onSuccess: _parseSongs,
-      errorPrefix: '歌曲列表请求失败',
+      parse: _parseSongs,
     );
   }
 
   @override
   Future<List<Album>> fetchAlbums({String? artistName}) {
-    return _execute(
-      apiCall: (api, sid) => api.listAlbums(
+    return _fetchAllPages(
+      errorPrefix: '专辑列表请求失败',
+      apiCall: (api, sid, offset) => api.listAlbums(
         sid: sid,
+        offset: offset,
         limit: 500,
         artist: artistName,
       ),
-      onSuccess: (body, api, sid) {
+      parse: (body, api, sid) {
         final albums =
             (body['data'] as Map<String, dynamic>?)?['albums']
                 as List<dynamic>? ??
@@ -196,15 +261,16 @@ class SynoMusicRepository implements MusicSourceRepository {
           return album.copyWith(coverUrl: coverUrl);
         }).toList(growable: false);
       },
-      errorPrefix: '专辑列表请求失败',
     );
   }
 
   @override
   Future<List<Artist>> fetchArtists() {
-    return _execute(
-      apiCall: (api, sid) => api.listArtists(sid: sid, limit: 500),
-      onSuccess: (body, api, sid) {
+    return _fetchAllPages(
+      errorPrefix: '歌手列表请求失败',
+      apiCall: (api, sid, offset) =>
+          api.listArtists(sid: sid, offset: offset, limit: 500),
+      parse: (body, api, sid) {
         final artists =
             (body['data'] as Map<String, dynamic>?)?['artists']
                 as List<dynamic>? ??
@@ -218,21 +284,21 @@ class SynoMusicRepository implements MusicSourceRepository {
           return artist.copyWith(coverUrl: coverUrl);
         }).toList(growable: false);
       },
-      errorPrefix: '歌手列表请求失败',
     );
   }
 
   @override
   Future<List<SongItem>> fetchAlbumSongs(Album album) {
-    return _execute(
-      apiCall: (api, sid) => api.listSongs(
+    return _fetchAllPages(
+      errorPrefix: '专辑歌曲请求失败',
+      apiCall: (api, sid, offset) => api.listSongs(
         sid: sid,
+        offset: offset,
         limit: 500,
         album: album.title,
         albumArtist: album.artist,
       ),
-      onSuccess: _parseSongs,
-      errorPrefix: '专辑歌曲请求失败',
+      parse: _parseSongs,
     );
   }
 
@@ -240,10 +306,15 @@ class SynoMusicRepository implements MusicSourceRepository {
 
   @override
   Future<List<SongItem>> search(String keyword) {
-    return _execute(
-      apiCall: (api, sid) => api.search(sid: sid, keyword: keyword),
-      onSuccess: _parseSongs,
+    return _fetchAllPages(
       errorPrefix: '搜索失败',
+      apiCall: (api, sid, offset) => api.search(
+        sid: sid,
+        keyword: keyword,
+        offset: offset,
+        limit: 500,
+      ),
+      parse: _parseSongs,
     );
   }
 
@@ -251,14 +322,15 @@ class SynoMusicRepository implements MusicSourceRepository {
 
   @override
   Future<List<FavoriteSong>> fetchFavorites() async {
-    final songs = await _execute(
-      apiCall: (api, sid) => api.listSongs(
+    final songs = await _fetchAllPages(
+      errorPrefix: '收藏列表请求失败',
+      apiCall: (api, sid, offset) => api.listSongs(
         sid: sid,
+        offset: offset,
         limit: 500,
         ratingFilter: 5,
       ),
-      onSuccess: _parseSongs,
-      errorPrefix: '收藏列表请求失败',
+      parse: _parseSongs,
     );
     return songs
         .map((song) => FavoriteSong.fromSongItem(song))
@@ -306,9 +378,11 @@ class SynoMusicRepository implements MusicSourceRepository {
 
   @override
   Future<List<Playlist>> fetchPlaylists() {
-    return _execute(
-      apiCall: (api, sid) => api.listPlaylists(sid: sid),
-      onSuccess: (body, api, sid) {
+    return _fetchAllPages(
+      errorPrefix: '歌单列表请求失败',
+      apiCall: (api, sid, offset) =>
+          api.listPlaylists(sid: sid, offset: offset, limit: 500),
+      parse: (body, api, sid) {
         final playlists =
             (body['data'] as Map<String, dynamic>?)?['playlists']
                 as List<dynamic>? ??
@@ -318,15 +392,20 @@ class SynoMusicRepository implements MusicSourceRepository {
             .map(Playlist.fromMap)
             .toList(growable: false);
       },
-      errorPrefix: '歌单列表请求失败',
     );
   }
 
   @override
   Future<List<SongItem>> fetchPlaylistSongs(String playlistId) {
-    return _execute(
-      apiCall: (api, sid) => api.getPlaylistInfo(sid: sid, id: playlistId),
-      onSuccess: (body, api, sid) {
+    return _fetchAllPages(
+      errorPrefix: '歌单歌曲请求失败',
+      apiCall: (api, sid, offset) => api.getPlaylistInfo(
+        sid: sid,
+        id: playlistId,
+        offset: offset,
+        limit: 500,
+      ),
+      parse: (body, api, sid) {
         // 歌单歌曲在 data.playlists[0].additional 的 songs 字段中
         final data = body['data'] as Map<String, dynamic>?;
         final playlists = data?['playlists'] as List<dynamic>? ?? [];
@@ -337,7 +416,6 @@ class SynoMusicRepository implements MusicSourceRepository {
         final songs = additional?['songs'] as List<dynamic>? ?? [];
         return _parseSongList(songs, api, sid);
       },
-      errorPrefix: '歌单歌曲请求失败',
     );
   }
 
@@ -385,12 +463,50 @@ class SynoMusicRepository implements MusicSourceRepository {
   @override
   Future<void> removeSongFromPlaylist(String playlistId, String songId) {
     return _execute<void>(
-      apiCall: (api, sid) => api.removeSongsFromPlaylist(
-        sid: sid,
-        playlistId: playlistId,
-        offset: 0,
-        limit: 1,
-      ),
+      apiCall: (api, sid) async {
+        // 群晖 updatesongs 按 offset/limit 定位待删除歌曲，
+        // 需先在歌单内找到目标歌曲的行号，再删除。
+        // 歌单歌曲可能分页，循环查找目标歌曲所在的页。
+        const pageSize = 500;
+        var offset = 0;
+        var globalIndex = -1;
+        while (true) {
+          final info =
+              await api.getPlaylistInfo(sid: sid, id: playlistId,
+                  offset: offset, limit: pageSize);
+          final data = info['data'] as Map<String, dynamic>?;
+          final playlists = data?['playlists'] as List<dynamic>? ?? [];
+          if (playlists.isEmpty) {
+            throw const MusicSourceConnectionException('歌单不存在或为空');
+          }
+          final first = playlists.first;
+          if (first is! Map<String, dynamic>) {
+            throw const MusicSourceConnectionException('歌单数据格式异常');
+          }
+          final additional = first['additional'] as Map<String, dynamic>?;
+          final songs = additional?['songs'] as List<dynamic>? ?? [];
+          final pageIndex = songs.indexWhere((item) {
+            if (item is Map<String, dynamic>) return '${item['id']}' == songId;
+            return false;
+          });
+          if (pageIndex >= 0) {
+            globalIndex = offset + pageIndex;
+            break;
+          }
+          if (songs.length < pageSize) break;
+          offset += pageSize;
+        }
+        if (globalIndex < 0) {
+          throw const MusicSourceConnectionException('歌曲不在歌单中');
+        }
+        return api.removeSongsFromPlaylist(
+          sid: sid,
+          playlistId: playlistId,
+          offset: globalIndex,
+          limit: 1,
+          songs: songId,
+        );
+      },
       onSuccess: (body, api, sid) {},
       errorPrefix: '从歌单移除失败',
     );
